@@ -9,9 +9,6 @@ export default function LoginPage() {
     const supabase = createClient()
 
     const handleGoogleLogin = async (userType: 'guide' | 'company') => {
-        // Para depurar, simplificamos la URL de redirección al mínimo.
-        // Esto ayudará a confirmar que la URL base está correctamente configurada en Supabase.
-        // Después de iniciar sesión, serás redirigido a la página de callback, y de ahí a la página principal ('/').
         const redirectTo = `${window.location.origin}/auth/callback`;
 
         await supabase.auth.signInWithOAuth({
