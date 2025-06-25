@@ -22,31 +22,36 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
     const pathname = usePathname();
     const router = useRouter();
     const [user, setUser] = React.useState<SupabaseUser | null>(null);
+    const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
 
     React.useEffect(() => {
         const { data: authListener } = supabase.auth.onAuthStateChange(
             async (event, session) => {
                 try {
+                    setIsLoading(true);
                     if (session) {
                         const { data: guideProfile, error: selectError } = await supabase
                             .from('guides')
-                            .select('id')
+                            .select('id, avatar')
                             .eq('id', session.user.id)
                             .single();
 
-                        if(selectError && selectError.code !== 'PGRST116') { // PGRST116: "exact one row not found" which is fine
+                        if(selectError && selectError.code !== 'PGRST116') {
                             console.error("GuideLayout: Error checking for profile:", selectError);
                             throw selectError;
                         }
 
-                        if (!guideProfile) {
+                        if (guideProfile) {
+                            setAvatarUrl(guideProfile.avatar);
+                        } else {
                            const { error: insertError } = await supabase.from('guides').insert({
                                 id: session.user.id,
                                 email: session.user.email,
                                 name: session.user.user_metadata?.full_name || 'Nuevo Guía',
                                 avatar: session.user.user_metadata?.avatar_url
                             });
+                            setAvatarUrl(session.user.user_metadata?.avatar_url);
                             
                             if (insertError) {
                                 console.error("GuideLayout: Error creating new profile:", insertError);
@@ -71,7 +76,7 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
         return () => {
             authListener.subscription.unsubscribe();
         };
-    }, [router]);
+    }, [router, pathname]);
 
     const handleSignOut = async () => {
         await supabase.auth.signOut();
@@ -137,8 +142,8 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="icon" className="overflow-hidden rounded-full">
-                                {user?.user_metadata?.avatar_url ? (
-                                    <img src={user.user_metadata.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                                {avatarUrl ? (
+                                    <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
                                 ) : (
                                     <UserCircle className="h-6 w-6" />
                                 )}
