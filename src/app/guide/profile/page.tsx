@@ -63,33 +63,24 @@ export default function GuideProfilePage() {
     const { reset } = form;
 
     const fetchGuideData = React.useCallback(async () => {
-        console.log("GuideProfile: Iniciando la carga de datos del perfil...");
         setIsLoading(true);
         
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-            console.error("GuideProfile: No se encontró un usuario autenticado.");
             toast({ title: "Error", description: "Debes iniciar sesión para ver tu perfil.", variant: "destructive" });
             setIsLoading(false);
             return;
         }
-        console.log("GuideProfile: Usuario autenticado encontrado:", user.id);
 
         try {
-            console.log("GuideProfile: Obteniendo datos del guía, especialidades e idiomas...");
             const [guideResponse, specialtiesResponse, languagesResponse] = await Promise.all([
                 supabase.from("guides").select("*").eq("id", user.id).single(),
                 supabase.from('expertise').select('name').eq('state', true),
                 supabase.from('languaje').select('name')
             ]);
             
-            console.log("GuideProfile: Respuesta de Supabase (guía):", { data: guideResponse.data, error: guideResponse.error });
-            console.log("GuideProfile: Respuesta de Supabase (especialidades):", { data: specialtiesResponse.data, error: specialtiesResponse.error });
-            console.log("GuideProfile: Respuesta de Supabase (idiomas):", { data: languagesResponse.data, error: languagesResponse.error });
-
             const { data: guideData, error: guideError } = guideResponse;
             if (guideData) {
-              console.log("GuideProfile: Perfil de guía encontrado. Reseteando formulario con:", guideData);
               reset({
                 name: guideData.name || "",
                 email: guideData.email || "",
@@ -101,34 +92,29 @@ export default function GuideProfilePage() {
               setAvatarUrl(guideData.avatar);
               setAvatarPreview(guideData.avatar);
             } else if (guideError && guideError.code !== 'PGRST116') {
-                console.error("GuideProfile: Error al obtener el perfil del guía:", guideError);
+                console.error("Error al obtener el perfil del guía:", guideError);
                 throw new Error(`Error fetching guide profile: ${guideError.message}`);
-            } else {
-                console.log("GuideProfile: No se encontró perfil de guía, probablemente es un nuevo usuario.");
             }
 
             const { data: specialtiesData, error: specialtiesError } = specialtiesResponse;
             if (specialtiesError) {
-                console.error("GuideProfile: Error al obtener especialidades:", specialtiesError);
+                console.error("Error al obtener especialidades:", specialtiesError);
                 throw new Error(`Error fetching specialties: ${specialtiesError.message}`);
             }
-            console.log("GuideProfile: Especialidades obtenidas:", specialtiesData);
             setAllSpecialties(specialtiesData || []);
 
             const { data: languagesData, error: languagesError } = languagesResponse;
             if (languagesError) {
-                console.error("GuideProfile: Error al obtener idiomas:", languagesError);
+                console.error("Error al obtener idiomas:", languagesError);
                 throw new Error(`Error fetching languages: ${languagesError.message}`);
             }
-            console.log("GuideProfile: Idiomas obtenidos:", languagesData);
             setAllLanguages(languagesData || []);
 
         } catch (error) {
-            console.error("GuideProfile: Catch - Error completo durante la carga de datos:", error);
+            console.error("Error completo durante la carga de datos:", error);
             const errorMessage = error instanceof Error ? error.message : "Un error desconocido ocurrió.";
             toast({ title: "Error de Carga", description: `No se pudieron cargar los datos del perfil: ${errorMessage}`, variant: "destructive" });
         } finally {
-            console.log("GuideProfile: Finalizando carga de datos. isLoading=false");
             setIsLoading(false);
         }
     }, [toast, reset]);
