@@ -30,7 +30,7 @@ export async function sendOfferEmail({ to, guideName, companyName, jobType, star
     // Se recomienda usar el dominio de la app, por ejemplo: `https://tourlead.vercel.app`
     const appUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
 
-    const body = `
+    const htmlBody = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h1>¡Hola ${guideName}!</h1>
         <p>Tienes una nueva oferta de trabajo de <strong>${companyName}</strong> en TourLead Connect.</p>
@@ -48,10 +48,13 @@ export async function sendOfferEmail({ to, guideName, companyName, jobType, star
       </div>
     `;
 
+    const textBody = `¡Hola ${guideName}!\n\nTienes una nueva oferta de trabajo de ${companyName} en TourLead Connect.\n\nDetalles de la Oferta:\n- Tipo de Trabajo: ${jobType}\n- Fechas: Del ${formattedStartDate} al ${formattedEndDate}\n\nPara ver todos los detalles, aceptar o rechazar la oferta, por favor ingresa a tu panel visitando la siguiente URL:\n${appUrl}/guide/offers\n\n¡Gracias por usar TourLead Connect!`;
+
     return await resend.emails.send({
         from: from,
         to: to,
         subject: subject,
-        html: body,
+        html: htmlBody,
+        text: textBody,
     });
 }
