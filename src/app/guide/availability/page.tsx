@@ -136,6 +136,9 @@ export default function AvailabilityPage() {
               opacity: 0.5
             },
           }}
+          classNames={{
+            day_today: 'text-foreground'
+          }}
         />
         )}
       </CardContent>
