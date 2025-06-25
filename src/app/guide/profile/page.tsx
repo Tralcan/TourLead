@@ -1,3 +1,4 @@
+
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -18,14 +19,35 @@ import {
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+
+const allSpecialties = [
+  { id: 'senderismo', label: 'Senderismo' },
+  { id: 'historia', label: 'Historia' },
+  { id: 'arte', label: 'Arte' },
+  { id: 'gastronomia', label: 'Gastronomía' },
+  { id: 'aventura', label: 'Aventura' },
+  { id: 'naturaleza', label: 'Naturaleza' },
+  { id: 'urbano', label: 'Tours Urbanos' },
+  { id: 'fotografia', label: 'Fotografía' },
+];
+
+const allLanguages = [
+  { id: 'espanol', label: 'Español' },
+  { id: 'ingles', label: 'Inglés' },
+  { id: 'frances', label: 'Francés' },
+  { id: 'aleman', label: 'Alemán' },
+  { id: 'italiano', label: 'Italiano' },
+  { id: 'portugues', label: 'Portugués' },
+];
 
 const profileFormSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
   email: z.string().email(),
-  specialties: z.string().optional(),
-  languages: z.string().optional(),
+  specialties: z.array(z.string()).optional(),
+  languages: z.array(z.string()).optional(),
   rate: z.coerce.number().min(0, "La tarifa debe ser un número positivo.").optional(),
   avatar: z.any().optional(),
 })
@@ -37,14 +59,15 @@ export default function GuideProfilePage() {
     const supabase = createClient();
     const [isLoading, setIsLoading] = React.useState(true);
     const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
+    const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
 
     const form = useForm<ProfileFormValues>({
       resolver: zodResolver(profileFormSchema),
       defaultValues: {
         name: "",
         email: "",
-        specialties: "",
-        languages: "",
+        specialties: [],
+        languages: [],
         rate: 0,
       },
       mode: "onChange",
@@ -68,11 +91,14 @@ export default function GuideProfilePage() {
 
         if (data) {
           form.reset({
-            ...data,
-            specialties: data.specialties?.join(", ") || "",
-            languages: data.languages?.join(", ") || "",
+            name: data.name || "",
+            email: data.email || "",
+            rate: data.rate || 0,
+            specialties: data.specialties || [],
+            languages: data.languages || [],
           });
           setAvatarUrl(data.avatar);
+          setAvatarPreview(data.avatar);
         } else if (error) {
             console.error(error);
             toast({ title: "Error", description: "No se pudo cargar el perfil del guía.", variant: "destructive" });
@@ -82,6 +108,14 @@ export default function GuideProfilePage() {
       fetchGuideData();
     }, [form, supabase, toast]);
 
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+      if (event.target.files && event.target.files.length > 0) {
+          const file = event.target.files[0];
+          const previewUrl = URL.createObjectURL(file);
+          setAvatarPreview(previewUrl);
+          form.setValue('avatar', event.target.files);
+      }
+  };
 
   async function onSubmit(data: ProfileFormValues) {
     const { data: { user } } = await supabase.auth.getUser();
@@ -90,14 +124,35 @@ export default function GuideProfilePage() {
         return;
     }
     
+    let newAvatarUrl = avatarUrl;
+    const avatarFile = data.avatar?.[0];
+
+    if (avatarFile) {
+        const filePath = `${user.id}/${Date.now()}_${avatarFile.name}`;
+        const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, avatarFile, {
+                upsert: true
+            });
+        
+        if (uploadError) {
+            toast({ title: "Error al subir imagen", description: uploadError.message, variant: "destructive" });
+            return;
+        }
+
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+        newAvatarUrl = urlData.publicUrl;
+    }
+
     const { error } = await supabase
       .from("guides")
       .update({
         name: data.name,
         email: data.email,
-        specialties: data.specialties?.split(",").map(s => s.trim()).filter(Boolean) || [],
-        languages: data.languages?.split(",").map(l => l.trim()).filter(Boolean) || [],
+        specialties: data.specialties,
+        languages: data.languages,
         rate: data.rate,
+        avatar: newAvatarUrl
       })
       .eq("id", user.id);
     
@@ -108,6 +163,9 @@ export default function GuideProfilePage() {
             title: "Perfil Actualizado",
             description: "Tu perfil de guía se ha guardado correctamente.",
         });
+        if (newAvatarUrl !== avatarUrl) {
+          setAvatarUrl(newAvatarUrl);
+        }
     }
   }
 
@@ -123,18 +181,26 @@ export default function GuideProfilePage() {
         ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <div className="flex items-center gap-6">
-                <Avatar className="h-24 w-24">
-                    <AvatarImage src={avatarUrl ?? undefined} />
-                    <AvatarFallback>{form.getValues('name')?.charAt(0)}</AvatarFallback>
-                </Avatar>
-                {/* La subida de archivos es más compleja y se omite por ahora */}
-                <div className="flex-1">
-                  <FormLabel>Foto de Perfil</FormLabel>
-                  <Input type="file" disabled/>
-                  <FormDescription>La subida de una nueva foto de perfil no está implementada todavía.</FormDescription>
-                </div>
-            </div>
+            <FormField
+              control={form.control}
+              name="avatar"
+              render={() => (
+                <FormItem className="flex items-center gap-6">
+                    <Avatar className="h-24 w-24">
+                        <AvatarImage src={avatarPreview ?? undefined} />
+                        <AvatarFallback>{form.getValues('name')?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <FormLabel>Foto de Perfil</FormLabel>
+                      <FormControl>
+                        <Input type="file" accept="image/*" onChange={handleAvatarChange} />
+                      </FormControl>
+                      <FormDescription>Sube una nueva foto de perfil. La imagen se guardará al actualizar el perfil.</FormDescription>
+                      <FormMessage />
+                    </div>
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <FormField
@@ -163,51 +229,96 @@ export default function GuideProfilePage() {
                     </FormItem>
                 )}
                 />
-                <FormField
-                control={form.control}
-                name="specialties"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Especialidades</FormLabel>
-                    <FormControl>
-                        <Input placeholder="ej., Senderismo, Historia, Arte" {...field} />
-                    </FormControl>
-                    <FormDescription>Separa las especialidades con una coma.</FormDescription>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                control={form.control}
-                name="languages"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Idiomas Hablados</FormLabel>
-                    <FormControl>
-                        <Input placeholder="ej., Inglés, Español" {...field} />
-                    </FormControl>
-                    <FormDescription>Separa los idiomas con una coma.</FormDescription>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                control={form.control}
-                name="rate"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Tarifa (por día)</FormLabel>
-                    <FormControl>
-                        <div className="relative">
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">$</span>
-                            <Input type="number" className="pl-7" placeholder="200" {...field} />
-                        </div>
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
             </div>
+            
+            <FormField
+              control={form.control}
+              name="specialties"
+              render={() => (
+                <FormItem>
+                  <FormLabel>Especialidades</FormLabel>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 rounded-md border p-4">
+                    {allSpecialties.map((item) => (
+                      <FormField
+                        key={item.id}
+                        control={form.control}
+                        name="specialties"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(item.id)}
+                                onCheckedChange={(checked) => {
+                                  const currentValue = field.value || [];
+                                  return checked
+                                    ? field.onChange([...currentValue, item.id])
+                                    : field.onChange(currentValue.filter((v) => v !== item.id));
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal text-sm">{item.label}</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+             <FormField
+              control={form.control}
+              name="languages"
+              render={() => (
+                <FormItem>
+                  <FormLabel>Idiomas Hablados</FormLabel>
+                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 rounded-md border p-4">
+                    {allLanguages.map((item) => (
+                      <FormField
+                        key={item.id}
+                        control={form.control}
+                        name="languages"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(item.id)}
+                                onCheckedChange={(checked) => {
+                                  const currentValue = field.value || [];
+                                  return checked
+                                    ? field.onChange([...currentValue, item.id])
+                                    : field.onChange(currentValue.filter((v) => v !== item.id));
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal text-sm">{item.label}</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="rate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tarifa (por día)</FormLabel>
+                  <FormControl>
+                      <div className="relative w-full md:w-1/2">
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">$</span>
+                          <Input type="number" className="pl-7" placeholder="200" {...field} />
+                      </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">Actualizar Perfil</Button>
           </form>
