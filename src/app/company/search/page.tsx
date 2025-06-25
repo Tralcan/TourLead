@@ -30,6 +30,7 @@ import { Guide } from "@/lib/types";
 const supabase = createClient();
 
 async function getGuideRating(guideId: string) {
+    console.log(`getGuideRating: Buscando calificaciones para guide_id: ${guideId}`);
     const { data, error } = await supabase
         .from('commitments')
         .select('guide_rating')
@@ -37,18 +38,21 @@ async function getGuideRating(guideId: string) {
         .not('guide_rating', 'is', null);
 
     if (error) {
-        // Log the error but don't throw, to avoid crashing the whole page
-        console.error(`Error fetching rating for guide ${guideId}:`, error);
+        console.error(`getGuideRating: Error al buscar calificaciones para ${guideId}:`, error);
         return { rating: 0, reviews: 0 };
     }
     
     if (!data || data.length === 0) {
+        console.log(`getGuideRating: No se encontraron calificaciones para ${guideId}.`);
         return { rating: 0, reviews: 0 };
     }
 
+    console.log(`getGuideRating: Se encontraron ${data.length} calificaciones para ${guideId}.`, data);
     const totalRating = data.reduce((acc, curr) => acc + (curr.guide_rating || 0), 0);
     const averageRating = totalRating / data.length;
-    return { rating: parseFloat(averageRating.toFixed(1)), reviews: data.length };
+    const result = { rating: parseFloat(averageRating.toFixed(1)), reviews: data.length };
+    console.log(`getGuideRating: Resultado calculado para ${guideId}:`, result);
+    return result;
 }
 
 // Helper to format a Date object to 'YYYY-MM-DD' string, ignoring timezone.
@@ -69,39 +73,52 @@ export default function SearchGuidesPage() {
     const [filteredGuides, setFilteredGuides] = React.useState<Guide[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [specialtiesList, setSpecialtiesList] = React.useState<string[]>([]);
+    const [renderError, setRenderError] = React.useState<Error | null>(null);
+
+    console.log("SearchPage: Componente renderizado.");
 
     React.useEffect(() => {
         async function fetchGuides() {
+            console.log("SearchPage: Iniciando carga de guías...");
             setIsLoading(true);
             try {
                 const { data: guidesData, error: guidesError } = await supabase.from('guides').select('*');
 
                 if (guidesError) {
-                    console.error("Failed to fetch guides:", guidesError);
+                    console.error("SearchPage: Fallo al obtener guías:", guidesError);
+                    setIsLoading(false);
                     return; 
                 }
 
                 if (guidesData) {
+                    console.log(`SearchPage: Se encontraron ${guidesData.length} guías. Obteniendo calificaciones...`);
                     const guidesWithRatings = await Promise.all(
                         guidesData.map(async (guide) => {
                             try {
                                 const { rating, reviews } = await getGuideRating(guide.id);
                                 return { ...guide, rating, reviews } as Guide;
                             } catch (ratingError) {
-                                console.error(`Failed to process rating for guide ${guide.id}:`, ratingError);
+                                console.error(`SearchPage: Fallo al procesar calificación para guía ${guide.id}:`, ratingError);
                                 return { ...guide, rating: 0, reviews: 0 } as Guide;
                             }
                         })
                     );
                     
+                    console.log("SearchPage: Calificaciones obtenidas. Procesando especialidades...");
                     const allSpecialties = [...new Set(guidesWithRatings.flatMap(g => g.specialties || []))];
                     setSpecialtiesList(allSpecialties);
+                    console.log("SearchPage: Lista de especialidades creada:", allSpecialties);
 
+                    console.log("SearchPage: Actualizando estado con los guías...");
                     setAllGuides(guidesWithRatings);
                     setFilteredGuides(guidesWithRatings);
+                    console.log("SearchPage: Estado actualizado. Carga completa.");
+                } else {
+                     console.log("SearchPage: No se encontraron datos de guías.");
                 }
             } catch (error) {
-                console.error("An unexpected error occurred while fetching guides:", error);
+                console.error("SearchPage: Ocurrió un error inesperado al obtener guías:", error);
+                 if (error instanceof Error) setRenderError(error);
             } finally {
                 setIsLoading(false);
             }
@@ -110,135 +127,170 @@ export default function SearchGuidesPage() {
     }, []);
 
     const handleSearch = () => {
-        let guides = [...allGuides];
-        
-        if (specialty) {
-            guides = guides.filter(g => g.specialties?.includes(specialty));
-        }
+        try {
+            let guides = [...allGuides];
+            
+            if (specialty) {
+                guides = guides.filter(g => g.specialties?.includes(specialty));
+            }
 
-        if(startDate && endDate) {
-            guides = guides.filter(guide => {
-                if(!guide.availability || guide.availability.length === 0) return false;
-                const availableDates = new Set(guide.availability);
-                
-                let currentDate = new Date(startDate);
-                while (currentDate <= endDate) {
-                    if (availableDates.has(toYYYYMMDD(currentDate))) {
-                        return true;
+            if(startDate && endDate) {
+                guides = guides.filter(guide => {
+                    if(!guide.availability || guide.availability.length === 0) return false;
+                    const availableDates = new Set(guide.availability);
+                    
+                    let currentDate = new Date(startDate);
+                    while (currentDate <= endDate) {
+                        if (availableDates.has(toYYYYMMDD(currentDate))) {
+                            return true;
+                        }
+                        currentDate.setDate(currentDate.getDate() + 1);
                     }
-                    currentDate.setDate(currentDate.getDate() + 1);
-                }
-                return false;
-            });
+                    return false;
+                });
+            }
+            
+            setFilteredGuides(guides);
+        } catch(error) {
+            console.error("SearchPage: Error en handleSearch:", error);
+            if (error instanceof Error) setRenderError(error);
         }
-        
-        setFilteredGuides(guides);
     }
 
-    return (
-        <div className="space-y-6">
+    if (renderError) {
+         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Encuentra a tu Guía Perfecto</CardTitle>
-                    <CardDescription>Filtra guías por disponibilidad y especialidad para encontrar lo que necesitas.</CardDescription>
+                    <CardTitle>Error en la Aplicación</CardTitle>
+                    <CardDescription>Ha ocurrido un error al mostrar esta página. Por favor, revisa la consola del navegador para más detalles.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                        "w-full justify-start text-left font-normal",
-                                        !startDate && "text-muted-foreground"
-                                    )}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {startDate ? format(startDate, "PPP", { locale: es }) : <span>Elige una fecha de inicio</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus locale={es} />
-                            </PopoverContent>
-                        </Popover>
-
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                        "w-full justify-start text-left font-normal",
-                                        !endDate && "text-muted-foreground"
-                                    )}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {endDate ? format(endDate, "PPP", { locale: es }) : <span>Elige una fecha de fin</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus locale={es} />
-                            </PopoverContent>
-                        </Popover>
-                        
-                        <Select onValueChange={setSpecialty} value={specialty}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Selecciona una especialidad" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="">Todas las especialidades</SelectItem>
-                                {specialtiesList.map(spec => <SelectItem key={spec} value={spec}>{spec}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-
-                    </div>
+                    <pre className="text-sm text-destructive bg-muted p-4 rounded-md overflow-auto">{renderError.stack}</pre>
                 </CardContent>
-                <CardFooter>
-                    <Button onClick={handleSearch} className="bg-accent text-accent-foreground hover:bg-accent/90">Buscar Guías</Button>
-                </CardFooter>
             </Card>
+        );
+    }
+    
+    try {
+      return (
+          <div className="space-y-6">
+              <Card>
+                  <CardHeader>
+                      <CardTitle>Encuentra a tu Guía Perfecto</CardTitle>
+                      <CardDescription>Filtra guías por disponibilidad y especialidad para encontrar lo que necesitas.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <Popover>
+                              <PopoverTrigger asChild>
+                                  <Button
+                                      variant={"outline"}
+                                      className={cn(
+                                          "w-full justify-start text-left font-normal",
+                                          !startDate && "text-muted-foreground"
+                                      )}
+                                  >
+                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      {startDate ? format(startDate, "PPP", { locale: es }) : <span>Elige una fecha de inicio</span>}
+                                  </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                  <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus locale={es} />
+                              </PopoverContent>
+                          </Popover>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {isLoading ? <p>Cargando guías...</p> : filteredGuides.map(guide => (
-                    <Card key={guide.id} className="flex flex-col">
-                        <CardHeader className="flex flex-row items-center gap-4">
-                            <Avatar className="h-16 w-16">
-                                <AvatarImage src={guide.avatar ?? ''} alt={guide.name ?? ''} />
-                                <AvatarFallback>{guide.name?.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <CardTitle className="font-headline">{guide.name}</CardTitle>
-                                <CardDescription>{guide.email}</CardDescription>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="flex-grow space-y-4">
-                            <div className="flex flex-wrap gap-2">
-                                {guide.specialties?.map(spec => (
-                                    <Badge key={spec} variant="outline">{spec}</Badge>
-                                ))}
-                            </div>
-                            <div className="flex justify-between text-sm text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                    <DollarSign className="h-4 w-4 text-primary" />
-                                    <span>{guide.rate} / día</span>
-                                </div>
-                                <StarRatingDisplay rating={guide.rating} reviews={guide.reviews} />
-                            </div>
-                        </CardContent>
-                        <CardFooter>
-                            <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-                                <User className="mr-2 h-4 w-4" />
-                                Ver Perfil y Ofertar
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                ))}
-            </div>
-            {!isLoading && filteredGuides.length === 0 && (
-                <Card className="col-span-full text-center p-8">
-                    <CardTitle>No se encontraron guías</CardTitle>
-                    <CardDescription>Prueba con otros filtros de búsqueda.</CardDescription>
-                </Card>
-            )}
-        </div>
-    );
+                          <Popover>
+                              <PopoverTrigger asChild>
+                                  <Button
+                                      variant={"outline"}
+                                      className={cn(
+                                          "w-full justify-start text-left font-normal",
+                                          !endDate && "text-muted-foreground"
+                                      )}
+                                  >
+                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      {endDate ? format(endDate, "PPP", { locale: es }) : <span>Elige una fecha de fin</span>}
+                                  </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                  <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus locale={es} />
+                              </PopoverContent>
+                          </Popover>
+                          
+                          <Select onValueChange={setSpecialty} value={specialty}>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Selecciona una especialidad" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="">Todas las especialidades</SelectItem>
+                                  {specialtiesList.map(spec => <SelectItem key={spec} value={spec}>{spec}</SelectItem>)}
+                              </SelectContent>
+                          </Select>
+
+                      </div>
+                  </CardContent>
+                  <CardFooter>
+                      <Button onClick={handleSearch} className="bg-accent text-accent-foreground hover:bg-accent/90">Buscar Guías</Button>
+                  </CardFooter>
+              </Card>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {isLoading ? <p>Cargando guías...</p> : filteredGuides.map(guide => (
+                      <Card key={guide.id} className="flex flex-col">
+                          <CardHeader className="flex flex-row items-center gap-4">
+                              <Avatar className="h-16 w-16">
+                                  <AvatarImage src={guide.avatar ?? ''} alt={guide.name ?? ''} />
+                                  <AvatarFallback>{guide.name?.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                  <CardTitle className="font-headline">{guide.name}</CardTitle>
+                                  <CardDescription>{guide.email}</CardDescription>
+                              </div>
+                          </CardHeader>
+                          <CardContent className="flex-grow space-y-4">
+                              <div className="flex flex-wrap gap-2">
+                                  {guide.specialties?.map(spec => (
+                                      <Badge key={spec} variant="outline">{spec}</Badge>
+                                  ))}
+                              </div>
+                              <div className="flex justify-between text-sm text-muted-foreground">
+                                  <div className="flex items-center gap-1">
+                                      <DollarSign className="h-4 w-4 text-primary" />
+                                      <span>{guide.rate} / día</span>
+                                  </div>
+                                  <StarRatingDisplay rating={guide.rating} reviews={guide.reviews} />
+                              </div>
+                          </CardContent>
+                          <CardFooter>
+                              <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+                                  <User className="mr-2 h-4 w-4" />
+                                  Ver Perfil y Ofertar
+                              </Button>
+                          </CardFooter>
+                      </Card>
+                  ))}
+              </div>
+              {!isLoading && filteredGuides.length === 0 && (
+                  <Card className="col-span-full text-center p-8">
+                      <CardTitle>No se encontraron guías</CardTitle>
+                      <CardDescription>Prueba con otros filtros de búsqueda.</CardDescription>
+                  </Card>
+              )}
+          </div>
+      );
+    } catch(error) {
+        console.error("SearchPage: Error durante el renderizado del JSX:", error);
+        if (error instanceof Error && !renderError) {
+          // Evitar bucles infinitos de re-renderizado por error
+          // Usamos un micro-task para evitar actualizar el estado durante el render
+          Promise.resolve().then(() => setRenderError(error));
+        }
+         return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Procesando Error...</CardTitle>
+                </CardHeader>
+            </Card>
+        );
+    }
 }
