@@ -52,10 +52,9 @@ async function getGuideRating(guideId: string) {
 }
 
 const toYYYYMMDD = (date: Date) => {
-    const y = date.getFullYear();
-    const m = (date.getMonth() + 1).toString().padStart(2, '0');
-    const d = date.getDate().toString().padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    const d = new Date(date);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
 }
 
 
@@ -63,11 +62,14 @@ export default function SearchGuidesPage() {
     const [startDate, setStartDate] = React.useState<Date | undefined>();
     const [endDate, setEndDate] = React.useState<Date | undefined>();
     const [specialty, setSpecialty] = React.useState<string>('');
+    const [language, setLanguage] = React.useState<string>('');
     
     const [allGuides, setAllGuides] = React.useState<Guide[]>([]);
     const [filteredGuides, setFilteredGuides] = React.useState<Guide[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [specialtiesList, setSpecialtiesList] = React.useState<string[]>([]);
+    const [languagesList, setLanguagesList] = React.useState<string[]>([]);
+    const [hasSearched, setHasSearched] = React.useState(false);
 
     React.useEffect(() => {
         async function fetchGuides() {
@@ -92,8 +94,11 @@ export default function SearchGuidesPage() {
                     const allSpecialties = [...new Set(guidesWithRatings.flatMap(g => g.specialties || []))].filter(Boolean);
                     setSpecialtiesList(allSpecialties);
 
+                    const allLanguages = [...new Set(guidesWithRatings.flatMap(g => g.languages || []))].filter(Boolean);
+                    setLanguagesList(allLanguages);
+
                     setAllGuides(guidesWithRatings);
-                    setFilteredGuides(guidesWithRatings);
+                    setFilteredGuides([]);
                 }
             } catch (error) {
                 console.error("SearchPage: Ocurrió un error inesperado al obtener guías:", error);
@@ -105,10 +110,15 @@ export default function SearchGuidesPage() {
     }, []);
 
     const handleSearch = () => {
+        setHasSearched(true);
         let guides = [...allGuides];
         
         if (specialty) {
             guides = guides.filter(g => g.specialties?.includes(specialty));
+        }
+
+        if (language) {
+            guides = guides.filter(g => g.languages?.includes(language));
         }
 
         if(startDate && endDate) {
@@ -136,10 +146,10 @@ export default function SearchGuidesPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Encuentra a tu Guía Perfecto</CardTitle>
-                    <CardDescription>Filtra guías por disponibilidad y especialidad para encontrar lo que necesitas.</CardDescription>
+                    <CardDescription>Filtra guías por disponibilidad, especialidad e idioma para encontrar lo que necesitas.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button
@@ -186,6 +196,16 @@ export default function SearchGuidesPage() {
                             </SelectContent>
                         </Select>
 
+                        <Select onValueChange={(value) => setLanguage(value === 'all-languages' ? '' : value)} value={language || 'all-languages'}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecciona un idioma" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all-languages">Todos los idiomas</SelectItem>
+                                {languagesList.map(lang => <SelectItem key={lang} value={lang}>{lang}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+
                     </div>
                 </CardContent>
                 <CardFooter>
@@ -193,46 +213,56 @@ export default function SearchGuidesPage() {
                 </CardFooter>
             </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {isLoading ? <p>Cargando guías...</p> : filteredGuides.map(guide => (
-                    <Card key={guide.id} className="flex flex-col">
-                        <CardHeader className="flex flex-row items-center gap-4">
-                            <Avatar className="h-16 w-16">
-                                <AvatarImage src={guide.avatar ?? ''} alt={guide.name ?? ''} />
-                                <AvatarFallback>{guide.name?.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <CardTitle className="font-headline">{guide.name}</CardTitle>
-                                <CardDescription>{guide.email}</CardDescription>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="flex-grow space-y-4">
-                            <div className="flex flex-wrap gap-2">
-                                {guide.specialties?.map(spec => (
-                                    <Badge key={spec} variant="outline">{spec}</Badge>
-                                ))}
-                            </div>
-                            <div className="flex justify-between text-sm text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                    <DollarSign className="h-4 w-4 text-primary" />
-                                    <span>{guide.rate} / día</span>
-                                </div>
-                                <StarRatingDisplay rating={guide.rating} reviews={guide.reviews} />
-                            </div>
-                        </CardContent>
-                        <CardFooter>
-                            <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-                                <User className="mr-2 h-4 w-4" />
-                                Ver Perfil y Ofertar
-                            </Button>
-                        </CardFooter>
+            {isLoading ? (
+                <p className="text-center">Cargando...</p>
+            ) : hasSearched ? (
+                filteredGuides.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredGuides.map(guide => (
+                            <Card key={guide.id} className="flex flex-col">
+                                <CardHeader className="flex flex-row items-center gap-4">
+                                    <Avatar className="h-16 w-16">
+                                        <AvatarImage src={guide.avatar ?? ''} alt={guide.name ?? ''} />
+                                        <AvatarFallback>{guide.name?.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                        <CardTitle className="font-headline">{guide.name}</CardTitle>
+                                        <CardDescription>{guide.email}</CardDescription>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="flex-grow space-y-4">
+                                    <div className="flex flex-wrap gap-2">
+                                        {guide.specialties?.map(spec => (
+                                            <Badge key={spec} variant="outline">{spec}</Badge>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-between text-sm text-muted-foreground">
+                                        <div className="flex items-center gap-1">
+                                            <DollarSign className="h-4 w-4 text-primary" />
+                                            <span>{guide.rate} / día</span>
+                                        </div>
+                                        <StarRatingDisplay rating={guide.rating} reviews={guide.reviews} />
+                                    </div>
+                                </CardContent>
+                                <CardFooter>
+                                    <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+                                        <User className="mr-2 h-4 w-4" />
+                                        Ver Perfil y Ofertar
+                                    </Button>
+                                </CardFooter>
+                            </Card>
+                        ))}
+                    </div>
+                ) : (
+                    <Card className="text-center p-8">
+                        <CardTitle>No se encontraron guías</CardTitle>
+                        <CardDescription>Prueba con otros filtros de búsqueda.</CardDescription>
                     </Card>
-                ))}
-            </div>
-            {!isLoading && filteredGuides.length === 0 && (
-                <Card className="col-span-full text-center p-8">
-                    <CardTitle>No se encontraron guías</CardTitle>
-                    <CardDescription>Prueba con otros filtros de búsqueda.</CardDescription>
+                )
+            ) : (
+                <Card className="text-center p-8">
+                    <CardTitle>Realiza una búsqueda</CardTitle>
+                    <CardDescription>Utiliza los filtros de arriba para encontrar al guía perfecto.</CardDescription>
                 </Card>
             )}
         </div>
