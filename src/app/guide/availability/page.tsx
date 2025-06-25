@@ -145,13 +145,9 @@ export default function AvailabilityPage() {
       <CardFooter className="flex justify-between items-center border-t pt-6">
         <Button onClick={handleSave} className="bg-accent text-accent-foreground hover:bg-accent/90">Guardar Disponibilidad</Button>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
-             <div className="flex items-center gap-2">
-                <div className="h-4 w-4 rounded-sm border bg-background" />
-                <span>Disponible</span>
-            </div>
             <div className="flex items-center gap-2">
                 <div className="h-4 w-4 rounded-sm bg-primary" />
-                <span>Seleccionado</span>
+                <span>Disponible</span>
             </div>
             <div className="flex items-center gap-2">
                 <div className="h-4 w-4 rounded-sm bg-muted" />
