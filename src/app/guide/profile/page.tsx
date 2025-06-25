@@ -36,10 +36,11 @@ const profileFormSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
+const supabase = createClient();
+
 export default function GuideProfilePage() {
     const { toast } = useToast();
     const router = useRouter();
-    const supabase = createClient();
     const [isLoading, setIsLoading] = React.useState(true);
     const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
     const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
@@ -87,31 +88,31 @@ export default function GuideProfilePage() {
           });
           setAvatarUrl(guideData.avatar);
           setAvatarPreview(guideData.avatar);
-        } else if (guideError) {
+        } else if (guideError && guideError.code !== 'PGRST116') {
             console.error("Error fetching guide profile:", guideError);
             toast({ title: "Error", description: "No se pudo cargar el perfil del guía.", variant: "destructive" });
         }
 
         const { data: specialtiesData, error: specialtiesError } = specialtiesResponse;
-        if (specialtiesData) {
-            setAllSpecialties(specialtiesData);
-        } else {
+        if (specialtiesError) {
             console.error("Error fetching specialties:", specialtiesError);
             toast({ title: "Error", description: "No se pudieron cargar las especialidades.", variant: "destructive" });
+        } else {
+            setAllSpecialties(specialtiesData || []);
         }
 
         const { data: languagesData, error: languagesError } = languagesResponse;
-        if (languagesData) {
-            setAllLanguages(languagesData);
-        } else {
+        if (languagesError) {
             console.error("Error fetching languages:", languagesError);
             toast({ title: "Error", description: "No se pudieron cargar los idiomas.", variant: "destructive" });
+        } else {
+            setAllLanguages(languagesData || []);
         }
         
         setIsLoading(false);
       }
       fetchGuideData();
-    }, [form, supabase, toast]);
+    }, [form, toast]);
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
       if (event.target.files && event.target.files.length > 0) {
@@ -209,20 +210,20 @@ export default function GuideProfilePage() {
               )}
             />
             
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                  <FormItem>
-                  <FormLabel>Nombre Completo</FormLabel>
-                  <FormControl>
-                      <Input placeholder="Juan Pérez" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                  </FormItem>
-              )}
-            />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                      <FormItem>
+                      <FormLabel>Nombre Completo</FormLabel>
+                      <FormControl>
+                          <Input placeholder="Juan Pérez" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+                />
                 <FormField
                 control={form.control}
                 name="email"
