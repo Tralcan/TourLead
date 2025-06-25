@@ -22,12 +22,11 @@ const parseDateStringAsLocal = (dateString: string): Date => {
 
 // Helper to format a local Date object into a YYYY-MM-DD string, avoiding timezone issues.
 const formatLocalDate = (date: Date): string => {
-  const d = new Date(date);
-  // We use UTC methods to prevent the date from shifting due to the user's local timezone.
-  const year = d.getUTCFullYear();
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+    // We use local date parts, not UTC, to ensure we get the date as the user sees it.
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
 
 export default function AvailabilityPage() {
@@ -58,7 +57,7 @@ export default function AvailabilityPage() {
         if (guideData?.availability) {
             setDays(guideData.availability.map((d:string) => parseDateStringAsLocal(d)));
         }
-        if(guideError) console.error("Error fetching availability:", guideError);
+        if(guideError && guideError.code !== 'PGRST116') console.error("Error fetching availability:", guideError);
 
         const { data: commitmentsData, error: commitmentsError } = await supabase
             .from('commitments')
@@ -111,7 +110,10 @@ export default function AvailabilityPage() {
     <Card>
         <CardHeader>
             <CardTitle>Gestiona tu Disponibilidad</CardTitle>
-            <CardDescription>Selecciona las fechas en las que estás disponible para trabajar. Las fechas reservadas se muestran en gris.</CardDescription>
+            <CardDescription>
+                Haz clic en los días para marcarlos como disponibles. Los días ya reservados aparecerán en gris y no se pueden modificar.
+                Guarda los cambios para que las empresas puedan encontrarte.
+            </CardDescription>
         </CardHeader>
       <CardContent className="flex justify-center">
         {isLoading ? <p>Cargando calendario...</p> : (
@@ -137,20 +139,20 @@ export default function AvailabilityPage() {
         />
         )}
       </CardContent>
-      <CardFooter className="flex justify-between items-center">
+      <CardFooter className="flex justify-between items-center border-t pt-6">
         <Button onClick={handleSave} className="bg-accent text-accent-foreground hover:bg-accent/90">Guardar Disponibilidad</Button>
-        <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2">
-                <div className="h-4 w-4 rounded-full bg-primary" />
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+             <div className="flex items-center gap-2">
+                <div className="h-4 w-4 rounded-sm border bg-background" />
                 <span>Disponible</span>
             </div>
             <div className="flex items-center gap-2">
-                <div className="h-4 w-4 rounded-full bg-muted" />
-                <span>Reservado</span>
+                <div className="h-4 w-4 rounded-sm bg-primary" />
+                <span>Seleccionado</span>
             </div>
-             <div className="flex items-center gap-2">
-                <div className="h-4 w-4 rounded-full border bg-background" />
-                <span>No Disponible</span>
+            <div className="flex items-center gap-2">
+                <div className="h-4 w-4 rounded-sm bg-muted" />
+                <span>Reservado</span>
             </div>
         </div>
       </CardFooter>
