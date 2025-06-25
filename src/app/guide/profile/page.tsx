@@ -60,8 +60,9 @@ export default function GuideProfilePage() {
       mode: "onChange",
     });
 
-    React.useEffect(() => {
-      async function fetchGuideData() {
+    const { reset } = form;
+
+    const fetchGuideData = React.useCallback(async () => {
         setIsLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
@@ -70,49 +71,49 @@ export default function GuideProfilePage() {
             return;
         }
 
-        const [guideResponse, specialtiesResponse, languagesResponse] = await Promise.all([
-            supabase.from("guides").select("*").eq("id", user.id).single(),
-            supabase.from('expertise').select('name').eq('state', true),
-            supabase.from('languaje').select('name')
-        ]);
+        try {
+            const [guideResponse, specialtiesResponse, languagesResponse] = await Promise.all([
+                supabase.from("guides").select("*").eq("id", user.id).single(),
+                supabase.from('expertise').select('name').eq('state', true),
+                supabase.from('languaje').select('name')
+            ]);
 
-        const { data: guideData, error: guideError } = guideResponse;
-        if (guideData) {
-          form.reset({
-            name: guideData.name || "",
-            email: guideData.email || "",
-            phone: guideData.phone || "",
-            rate: guideData.rate || 0,
-            specialties: guideData.specialties || [],
-            languages: guideData.languages || [],
-          });
-          setAvatarUrl(guideData.avatar);
-          setAvatarPreview(guideData.avatar);
-        } else if (guideError && guideError.code !== 'PGRST116') {
-            console.error("Error fetching guide profile:", guideError);
-            toast({ title: "Error", description: "No se pudo cargar el perfil del guía.", variant: "destructive" });
-        }
+            const { data: guideData, error: guideError } = guideResponse;
+            if (guideData) {
+              reset({
+                name: guideData.name || "",
+                email: guideData.email || "",
+                phone: guideData.phone || "",
+                rate: guideData.rate || 0,
+                specialties: guideData.specialties || [],
+                languages: guideData.languages || [],
+              });
+              setAvatarUrl(guideData.avatar);
+              setAvatarPreview(guideData.avatar);
+            } else if (guideError && guideError.code !== 'PGRST116') {
+                throw new Error(`Error fetching guide profile: ${guideError.message}`);
+            }
 
-        const { data: specialtiesData, error: specialtiesError } = specialtiesResponse;
-        if (specialtiesError) {
-            console.error("Error fetching specialties:", specialtiesError);
-            toast({ title: "Error", description: "No se pudieron cargar las especialidades.", variant: "destructive" });
-        } else {
+            const { data: specialtiesData, error: specialtiesError } = specialtiesResponse;
+            if (specialtiesError) throw new Error(`Error fetching specialties: ${specialtiesError.message}`);
             setAllSpecialties(specialtiesData || []);
-        }
 
-        const { data: languagesData, error: languagesError } = languagesResponse;
-        if (languagesError) {
-            console.error("Error fetching languages:", languagesError);
-            toast({ title: "Error", description: "No se pudieron cargar los idiomas.", variant: "destructive" });
-        } else {
+            const { data: languagesData, error: languagesError } = languagesResponse;
+            if (languagesError) throw new Error(`Error fetching languages: ${languagesError.message}`);
             setAllLanguages(languagesData || []);
+
+        } catch (error) {
+            console.error("Error fetching profile page data:", error);
+            const errorMessage = error instanceof Error ? error.message : "Un error desconocido ocurrió.";
+            toast({ title: "Error de Carga", description: `No se pudieron cargar los datos del perfil: ${errorMessage}`, variant: "destructive" });
+        } finally {
+            setIsLoading(false);
         }
-        
-        setIsLoading(false);
-      }
+    }, [toast, reset]);
+
+    React.useEffect(() => {
       fetchGuideData();
-    }, [form, toast]);
+    }, [fetchGuideData]);
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
       if (event.target.files && event.target.files.length > 0) {
