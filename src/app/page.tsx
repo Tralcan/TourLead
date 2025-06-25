@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Briefcase, Building, MapPin, Users } from 'lucide-react';
+import { ArrowRight, Briefcase, Building, MapPin, Users, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
@@ -10,7 +10,10 @@ export default function Home() {
       <header className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         <Logo />
         <Button variant="ghost" asChild>
-          <Link href="#">Iniciar Sesión</Link>
+          <Link href="/login">
+            <LogIn className="mr-2 h-4 w-4" />
+            Iniciar Sesión
+          </Link>
         </Button>
       </header>
 

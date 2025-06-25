@@ -1,20 +1,18 @@
 "use client"
 
 import * as React from "react"
-import { addDays, isBefore, startOfToday, eachDayOfInterval, formatISO } from "date-fns"
+import { isBefore, startOfToday, eachDayOfInterval, formatISO } from "date-fns"
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase/client";
-
-// ID del guía logueado (hardcodeado para el ejemplo)
-const LOGGED_IN_GUIDE_ID = "guide1";
+import { createClient } from "@/lib/supabase/client";
 
 export default function AvailabilityPage() {
   const today = startOfToday();
   const { toast } = useToast();
+  const supabase = createClient();
   const [days, setDays] = React.useState<Date[] | undefined>([]);
   const [bookedDays, setBookedDays] = React.useState<Date[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -22,23 +20,28 @@ export default function AvailabilityPage() {
   React.useEffect(() => {
     async function fetchAvailability() {
         setIsLoading(true);
-        // Obtener disponibilidad guardada
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+            setIsLoading(false);
+            return;
+        }
+
         const { data: guideData, error: guideError } = await supabase
             .from('guides')
             .select('availability')
-            .eq('id', LOGGED_IN_GUIDE_ID)
+            .eq('id', user.id)
             .single();
 
         if (guideData?.availability) {
-            setDays(guideData.availability.map(d => new Date(d)));
+            setDays(guideData.availability.map((d:string) => new Date(d)));
         }
         if(guideError) console.error("Error fetching availability:", guideError);
 
-        // Obtener fechas de compromisos
         const { data: commitmentsData, error: commitmentsError } = await supabase
             .from('commitments')
             .select('start_date, end_date')
-            .eq('guide_id', LOGGED_IN_GUIDE_ID)
+            .eq('guide_id', user.id)
             .gt('end_date', new Date().toISOString());
         
         if (commitmentsData) {
@@ -51,15 +54,21 @@ export default function AvailabilityPage() {
         setIsLoading(false);
     }
     fetchAvailability();
-  }, []);
+  }, [supabase]);
 
   const handleSave = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        toast({ title: "Error", description: "Debes iniciar sesión.", variant: "destructive" });
+        return;
+    }
+
     const isoDates = days?.map(day => formatISO(day, { representation: 'date' }));
     
     const { error } = await supabase
       .from('guides')
       .update({ availability: isoDates })
-      .eq('id', LOGGED_IN_GUIDE_ID);
+      .eq('id', user.id);
 
     if (error) {
         toast({

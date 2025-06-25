@@ -19,64 +19,80 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 
 const profileFormSchema = z.object({
   name: z.string().min(2, "El nombre de la empresa debe tener al menos 2 caracteres."),
   email: z.string().email("Por favor, introduce una dirección de correo electrónico válida."),
-  specialties: z.string().min(1, "Por favor, enumera al menos una especialidad."),
-  details: z.string().max(500, "Los detalles no pueden exceder los 500 caracteres.").min(10, "Por favor, proporciona más detalles."),
+  specialties: z.string().optional(),
+  details: z.string().max(500, "Los detalles no pueden exceder los 500 caracteres.").optional(),
 })
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
-// ID de la compañía logueada (hardcodeado para el ejemplo)
-const LOGGED_IN_COMPANY_ID = "comp1";
-
 export default function CompanyProfilePage() {
     const { toast } = useToast()
-    const [defaultValues, setDefaultValues] = React.useState<Partial<ProfileFormValues>>({});
-
+    const supabase = createClient();
+    const [isLoading, setIsLoading] = React.useState(true);
+    
     const form = useForm<ProfileFormValues>({
         resolver: zodResolver(profileFormSchema),
-        values: defaultValues,
+        defaultValues: {
+            name: "",
+            email: "",
+            specialties: "",
+            details: "",
+        },
         mode: "onChange",
     })
 
     React.useEffect(() => {
         async function fetchCompanyData() {
+            setIsLoading(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                toast({ title: "Error", description: "Debes iniciar sesión para ver tu perfil.", variant: "destructive" });
+                setIsLoading(false);
+                return;
+            }
+
             const { data, error } = await supabase
                 .from("companies")
                 .select("*")
-                .eq("id", LOGGED_IN_COMPANY_ID)
+                .eq("id", user.id)
                 .single();
 
             if (data) {
-                const transformedData = {
+                form.reset({
                     ...data,
                     specialties: data.specialties?.join(", ") || "",
-                }
-                setDefaultValues(transformedData);
-                form.reset(transformedData);
-            } else {
+                });
+            } else if (error) {
                 console.error(error);
                 toast({ title: "Error", description: "No se pudo cargar el perfil de la empresa.", variant: "destructive" });
             }
+            setIsLoading(false);
         }
         fetchCompanyData();
-    }, [form, toast]);
+    }, [form, supabase, toast]);
 
 
   async function onSubmit(data: ProfileFormValues) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        toast({ title: "Error", description: "Debes iniciar sesión para actualizar tu perfil.", variant: "destructive" });
+        return;
+    }
+
     const { error } = await supabase
       .from('companies')
       .update({
         name: data.name,
         email: data.email,
-        specialties: data.specialties.split(',').map(s => s.trim()),
+        specialties: data.specialties?.split(',').map(s => s.trim()).filter(Boolean) || [],
         details: data.details,
       })
-      .eq('id', LOGGED_IN_COMPANY_ID)
+      .eq('id', user.id)
 
     if (error) {
         toast({ title: "Error", description: "No se pudo actualizar el perfil.", variant: "destructive" });
@@ -95,7 +111,7 @@ export default function CompanyProfilePage() {
         <CardDescription>Administra la información de tu empresa. Así es como aparecerás ante los guías.</CardDescription>
       </CardHeader>
       <CardContent>
-         {Object.keys(defaultValues).length === 0 ? (
+         {isLoading ? (
           <p>Cargando perfil...</p>
         ) : (
         <Form {...form}>

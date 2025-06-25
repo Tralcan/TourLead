@@ -19,69 +19,87 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 
 const profileFormSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
   email: z.string().email(),
-  specialties: z.string().min(1, "Por favor, enumera al menos una especialidad."),
-  languages: z.string().min(1, "Por favor, enumera al menos un idioma."),
-  rate: z.coerce.number().min(1, "La tarifa debe ser un número positivo."),
-  avatar: z.string().optional(),
+  specialties: z.string().optional(),
+  languages: z.string().optional(),
+  rate: z.coerce.number().min(0, "La tarifa debe ser un número positivo.").optional(),
+  avatar: z.any().optional(),
 })
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
-// ID del guía logueado (hardcodeado para el ejemplo)
-const LOGGED_IN_GUIDE_ID = "guide1";
-
 export default function GuideProfilePage() {
-    const { toast } = useToast()
-    const [defaultValues, setDefaultValues] = React.useState<Partial<ProfileFormValues>>({});
+    const { toast } = useToast();
+    const supabase = createClient();
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
 
     const form = useForm<ProfileFormValues>({
       resolver: zodResolver(profileFormSchema),
-      values: defaultValues, // Usar values en lugar de defaultValues para el re-render
+      defaultValues: {
+        name: "",
+        email: "",
+        specialties: "",
+        languages: "",
+        rate: 0,
+      },
       mode: "onChange",
     });
 
     React.useEffect(() => {
       async function fetchGuideData() {
+        setIsLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            toast({ title: "Error", description: "Debes iniciar sesión para ver tu perfil.", variant: "destructive" });
+            setIsLoading(false);
+            return;
+        }
+
         const { data, error } = await supabase
           .from("guides")
           .select("*")
-          .eq("id", LOGGED_IN_GUIDE_ID)
+          .eq("id", user.id)
           .single();
 
         if (data) {
-          const transformedData = {
+          form.reset({
             ...data,
             specialties: data.specialties?.join(", ") || "",
             languages: data.languages?.join(", ") || "",
-          }
-          setDefaultValues(transformedData);
-          form.reset(transformedData);
-        } else {
+          });
+          setAvatarUrl(data.avatar);
+        } else if (error) {
             console.error(error);
             toast({ title: "Error", description: "No se pudo cargar el perfil del guía.", variant: "destructive" });
         }
+        setIsLoading(false);
       }
       fetchGuideData();
-    }, [form, toast]);
+    }, [form, supabase, toast]);
 
 
   async function onSubmit(data: ProfileFormValues) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        toast({ title: "Error", description: "Debes iniciar sesión.", variant: "destructive" });
+        return;
+    }
+    
     const { error } = await supabase
       .from("guides")
       .update({
         name: data.name,
         email: data.email,
-        specialties: data.specialties.split(",").map(s => s.trim()),
-        languages: data.languages.split(",").map(l => l.trim()),
+        specialties: data.specialties?.split(",").map(s => s.trim()).filter(Boolean) || [],
+        languages: data.languages?.split(",").map(l => l.trim()).filter(Boolean) || [],
         rate: data.rate,
-        // La actualización del avatar (archivo) es más compleja y se omite aquí.
       })
-      .eq("id", LOGGED_IN_GUIDE_ID);
+      .eq("id", user.id);
     
     if (error) {
         toast({ title: "Error", description: "No se pudo actualizar el perfil.", variant: "destructive" });
@@ -100,33 +118,22 @@ export default function GuideProfilePage() {
         <CardDescription>Así es como tu perfil aparecerá a las empresas de tours.</CardDescription>
       </CardHeader>
       <CardContent>
-        {Object.keys(defaultValues).length === 0 ? (
+        {isLoading ? (
           <p>Cargando perfil...</p>
         ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <div className="flex items-center gap-6">
                 <Avatar className="h-24 w-24">
-                    <AvatarImage src={defaultValues.avatar || ''} />
-                    <AvatarFallback>{defaultValues.name?.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={avatarUrl ?? undefined} />
+                    <AvatarFallback>{form.getValues('name')?.charAt(0)}</AvatarFallback>
                 </Avatar>
-                <FormField
-                control={form.control}
-                name="avatar"
-                render={({ field }) => {
-                  const { value, ...rest } = field
-                  return (
-                    <FormItem className="flex-1">
-                      <FormLabel>Foto de Perfil</FormLabel>
-                      <FormControl>
-                        <Input type="file" {...rest} />
-                      </FormControl>
-                      <FormDescription>Sube una foto profesional.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )
-                }}
-                />
+                {/* La subida de archivos es más compleja y se omite por ahora */}
+                <div className="flex-1">
+                  <FormLabel>Foto de Perfil</FormLabel>
+                  <Input type="file" disabled/>
+                  <FormDescription>La subida de una nueva foto de perfil no está implementada todavía.</FormDescription>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

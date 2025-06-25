@@ -24,10 +24,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { StarRatingDisplay } from "@/components/star-rating";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import { Guide } from "@/lib/types";
 
-// Función para calcular rating y reviews de un guía
+const supabase = createClient();
+
 async function getGuideRating(guideId: string) {
     const { data, error } = await supabase
         .from('commitments')
@@ -82,19 +83,17 @@ export default function SearchGuidesPage() {
     const handleSearch = () => {
         let guides = [...allGuides];
         
-        // Filtrar por especialidad
         if (specialty) {
             guides = guides.filter(g => g.specialties?.includes(specialty));
         }
 
-        // Filtrar por fecha (lógica simplificada: verifica si alguna fecha seleccionable está en el rango)
         if(startDate && endDate) {
             guides = guides.filter(guide => {
                 if(!guide.availability) return false;
                 const availableDates = guide.availability.map(d => new Date(d).getTime());
                 for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                     if (availableDates.includes(d.getTime())) {
-                        return true; // Si encuentra al menos una fecha disponible en el rango, es un match.
+                        return true; 
                     }
                 }
                 return false;

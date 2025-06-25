@@ -15,11 +15,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format, isPast } from "date-fns";
 import { es } from "date-fns/locale";
 import { RateEntity } from "@/components/star-rating";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-
-// ID de la compañía logueada (hardcodeado para el ejemplo)
-const LOGGED_IN_COMPANY_ID = "comp1";
 
 type HiredGuide = {
     id: string;
@@ -38,11 +35,19 @@ type HiredGuide = {
 
 export default function HiredGuidesPage() {
     const { toast } = useToast();
+    const supabase = createClient();
     const [hiredGuides, setHiredGuides] = React.useState<HiredGuide[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
 
     const fetchHiredGuides = React.useCallback(async () => {
         setIsLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+            setIsLoading(false);
+            return;
+        }
+
         const { data, error } = await supabase
             .from('commitments')
             .select(`
@@ -59,7 +64,7 @@ export default function HiredGuidesPage() {
                     specialties
                 )
             `)
-            .eq('company_id', LOGGED_IN_COMPANY_ID);
+            .eq('company_id', user.id);
 
         if (data) {
             setHiredGuides(data as HiredGuide[]);
@@ -68,7 +73,7 @@ export default function HiredGuidesPage() {
             toast({ title: "Error", description: "No se pudieron cargar los guías contratados.", variant: "destructive" });
         }
         setIsLoading(false);
-    }, [toast]);
+    }, [supabase, toast]);
 
     React.useEffect(() => {
         fetchHiredGuides();
@@ -84,7 +89,7 @@ export default function HiredGuidesPage() {
             toast({ title: "Error", description: "No se pudo guardar la calificación.", variant: "destructive" });
         } else {
             toast({ title: "Éxito", description: "Calificación guardada correctamente." });
-            fetchHiredGuides(); // Recargar datos para mostrar la nueva calificación
+            fetchHiredGuides(); 
         }
     };
 

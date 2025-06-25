@@ -10,10 +10,10 @@ import { es } from "date-fns/locale";
 import { Check, X } from "lucide-react";
 import { StarRatingDisplay } from "@/components/star-rating";
 import React from "react";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
-// ID del guía logueado (hardcodeado para el ejemplo)
-const LOGGED_IN_GUIDE_ID = "guide2";
+const supabase = createClient();
 
 async function getCompanyRating(companyId: string) {
     const { data, error } = await supabase
@@ -36,8 +36,9 @@ export default function OffersPage() {
     const { toast } = useToast();
     const [offers, setOffers] = React.useState<JobOffer[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [user, setUser] = React.useState<User | null>(null);
 
-    const fetchOffers = React.useCallback(async () => {
+    const fetchOffers = React.useCallback(async (currentUser: User) => {
         setIsLoading(true);
         const { data, error } = await supabase
             .from('offers')
@@ -45,7 +46,7 @@ export default function OffersPage() {
                 *,
                 company:companies(*)
             `)
-            .eq('guide_id', LOGGED_IN_GUIDE_ID)
+            .eq('guide_id', currentUser.id)
             .eq('status', 'pending');
 
         if (data) {
@@ -65,13 +66,22 @@ export default function OffersPage() {
         }
         setIsLoading(false);
     }, []);
-
+    
     React.useEffect(() => {
-        fetchOffers();
+        const getUserAndOffers = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUser(user);
+                fetchOffers(user);
+            } else {
+                setIsLoading(false);
+            }
+        };
+        getUserAndOffers();
     }, [fetchOffers]);
 
+
     const handleAccept = async (offer: JobOffer) => {
-        // 1. Actualizar estado de la oferta a 'accepted'
         const { error: updateError } = await supabase
             .from('offers')
             .update({ status: 'accepted' })
@@ -82,7 +92,6 @@ export default function OffersPage() {
             return;
         }
 
-        // 2. Crear un nuevo compromiso
         const { error: insertError } = await supabase
             .from('commitments')
             .insert({
@@ -95,13 +104,12 @@ export default function OffersPage() {
         
         if (insertError) {
              toast({ title: "Error", description: "No se pudo crear el compromiso.", variant: "destructive" });
-             // Opcional: revertir el estado de la oferta si la inserción falla
         } else {
             toast({
                 title: "¡Oferta Aceptada!",
                 description: `Ahora estás reservado con ${offer.company.name}. Tu calendario ha sido actualizado.`,
             });
-            fetchOffers(); // Recargar ofertas
+            if(user) fetchOffers(user); 
         }
     }
 
@@ -118,7 +126,7 @@ export default function OffersPage() {
                 title: "Oferta Rechazada",
                 description: `Has rechazado la oferta de ${offer.company.name}.`,
             });
-            fetchOffers(); // Recargar ofertas
+             if(user) fetchOffers(user);
         }
     }
     

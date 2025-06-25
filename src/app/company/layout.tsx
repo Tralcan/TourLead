@@ -1,11 +1,13 @@
 'use client'
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Building2, Search, Users, PanelLeft, UserCircle, Mountain } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Building2, Search, Users, PanelLeft, UserCircle, Mountain, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { createClient } from '@/lib/supabase/client';
+import type { User } from '@supabase/supabase-js';
 
 const navItems = [
     { href: '/company/hired', icon: Users, label: 'Guías Contratados' },
@@ -15,6 +17,53 @@ const navItems = [
 
 export default function CompanyLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+    const router = useRouter();
+    const supabase = createClient();
+    const [user, setUser] = React.useState<User | null>(null);
+    const [isLoading, setIsLoading] = React.useState(true);
+
+    React.useEffect(() => {
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                if (session) {
+                    const { data: companyProfile } = await supabase
+                        .from('companies')
+                        .select('id')
+                        .eq('id', session.user.id)
+                        .single();
+
+                    if (!companyProfile) {
+                        await supabase.from('companies').insert({
+                            id: session.user.id,
+                            email: session.user.email,
+                            name: session.user.user_metadata?.full_name || 'Nueva Empresa',
+                        });
+                    }
+                    setUser(session.user);
+                } else {
+                    router.push('/login');
+                }
+                setIsLoading(false);
+            }
+        );
+
+        return () => {
+            authListener.subscription.unsubscribe();
+        };
+    }, [supabase, router]);
+    
+    const handleSignOut = async () => {
+        await supabase.auth.signOut();
+        router.push('/');
+    };
+    
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <p>Cargando panel de empresa...</p>
+            </div>
+        )
+    }
 
     return (
       <TooltipProvider>
@@ -67,16 +116,23 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="icon" className="overflow-hidden rounded-full">
-                                <UserCircle className="h-6 w-6" />
+                                {user?.user_metadata?.avatar_url ? (
+                                    <img src={user.user_metadata.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                                ) : (
+                                    <UserCircle className="h-6 w-6" />
+                                )}
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
+                            <DropdownMenuLabel>{user?.email || "Mi Cuenta"}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>Configuración</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => router.push('/company/profile')}>Perfil</DropdownMenuItem>
                             <DropdownMenuItem>Soporte</DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>Cerrar Sesión</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={handleSignOut}>
+                                <LogOut className="mr-2 h-4 w-4" />
+                                Cerrar Sesión
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </header>

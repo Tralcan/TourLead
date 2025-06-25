@@ -1,12 +1,13 @@
 'use client'
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { CalendarCheck, CalendarDays, Mail, User, PanelLeft, UserCircle, Mountain } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { CalendarCheck, CalendarDays, Mail, User, PanelLeft, UserCircle, Mountain, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-
+import { createClient } from '@/lib/supabase/client';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 const navItems = [
     { href: '/guide/commitments', icon: CalendarCheck, label: 'Mis Compromisos' },
@@ -17,13 +18,62 @@ const navItems = [
 
 export default function GuideLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+    const router = useRouter();
+    const supabase = createClient();
+    const [user, setUser] = React.useState<SupabaseUser | null>(null);
+    const [isLoading, setIsLoading] = React.useState(true);
+
+    React.useEffect(() => {
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                if (session) {
+                    // Check if guide profile exists, create if not
+                    const { data: guideProfile } = await supabase
+                        .from('guides')
+                        .select('id')
+                        .eq('id', session.user.id)
+                        .single();
+
+                    if (!guideProfile) {
+                        await supabase.from('guides').insert({
+                            id: session.user.id,
+                            email: session.user.email,
+                            name: session.user.user_metadata?.full_name || 'Nuevo Guía',
+                            avatar: session.user.user_metadata?.avatar_url
+                        });
+                    }
+                    setUser(session.user);
+                } else {
+                    router.push('/login');
+                }
+                setIsLoading(false);
+            }
+        );
+
+        return () => {
+            authListener.subscription.unsubscribe();
+        };
+    }, [supabase, router]);
+
+    const handleSignOut = async () => {
+        await supabase.auth.signOut();
+        router.push('/');
+    };
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <p>Cargando panel de guía...</p>
+            </div>
+        )
+    }
 
     return (
       <TooltipProvider>
         <div className="flex min-h-screen w-full flex-col bg-muted/40">
             <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
                 <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
-                    <Tooltip>
+                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Link
                                 href="/"
@@ -69,16 +119,23 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="icon" className="overflow-hidden rounded-full">
-                                <UserCircle className="h-6 w-6" />
+                                {user?.user_metadata?.avatar_url ? (
+                                    <img src={user.user_metadata.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                                ) : (
+                                    <UserCircle className="h-6 w-6" />
+                                )}
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
+                            <DropdownMenuLabel>{user?.email || "Mi Cuenta"}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>Configuración</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => router.push('/guide/profile')}>Perfil</DropdownMenuItem>
                             <DropdownMenuItem>Soporte</DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>Cerrar Sesión</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={handleSignOut}>
+                                <LogOut className="mr-2 h-4 w-4" />
+                                Cerrar Sesión
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </header>

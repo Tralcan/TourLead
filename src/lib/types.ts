@@ -1,33 +1,34 @@
 
 export type Guide = {
-  id: string;
+  id: string; // UUID del usuario
   name: string;
   email: string | null;
   avatar: string | null;
   specialties: string[] | null;
   languages: string[] | null;
   rate: number | null;
-  rating: number;
-  reviews: number;
-  availability: Date[];
-  commitments: Commitment[];
+  rating: number; // Calculado
+  reviews: number; // Calculado
+  availability: string[]; // Fechas en formato ISO string
+  commitments?: Commitment[];
 };
 
 export type Company = {
-  id: string;
+  id: string; // UUID del usuario
   name: string;
   email: string | null;
   avatar: string | null;
   specialties: string[] | null;
   details: string | null;
-  rating: number;
-  reviews: number;
+  rating: number; // Calculado
+  reviews: number; // Calculado
 };
 
 export type JobOffer = {
-  id: string;
+  id: number; // id autoincremental de la oferta
   company: Company;
-  guide_id: string;
+  company_id: string; // UUID de la empresa
+  guide_id: string; // UUID del guía
   job_type: string | null;
   description: string | null;
   startDate: Date;
@@ -36,10 +37,10 @@ export type JobOffer = {
 };
 
 export type Commitment = {
-  id: string;
+  id: number; // id autoincremental del compromiso
   company: Pick<Company, 'id' | 'name' | 'email'>;
-  company_id: string;
-  guide_id: string;
+  company_id: string; // UUID de la empresa
+  guide_id: string; // UUID del guía
   job_type: string | null;
   startDate: Date;
   endDate: Date;
