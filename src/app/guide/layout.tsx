@@ -24,40 +24,65 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
     const [isLoading, setIsLoading] = React.useState(true);
 
     React.useEffect(() => {
+        console.log("GuideLayout: useEffect started.");
         const { data: authListener } = supabase.auth.onAuthStateChange(
             async (event, session) => {
+                console.log("GuideLayout: Auth state changed. Event:", event);
                 try {
                     if (session) {
-                        // Check if guide profile exists, create if not
-                        const { data: guideProfile } = await supabase
+                        console.log("GuideLayout: Session found for user:", session.user.email);
+                        
+                        console.log("GuideLayout: Checking for existing guide profile for ID:", session.user.id);
+                        const { data: guideProfile, error: selectError } = await supabase
                             .from('guides')
                             .select('id')
                             .eq('id', session.user.id)
                             .single();
 
+                        if(selectError && selectError.code !== 'PGRST116') { // PGRST116: "exact one row not found" which is fine
+                            console.error("GuideLayout: Error checking for profile:", selectError);
+                            throw selectError;
+                        }
+
+                        console.log("GuideLayout: Profile check result:", guideProfile);
+
                         if (!guideProfile) {
-                           const { error } = await supabase.from('guides').insert({
+                           console.log("GuideLayout: No profile found. Creating new guide profile...");
+                           const { error: insertError } = await supabase.from('guides').insert({
                                 id: session.user.id,
                                 email: session.user.email,
                                 name: session.user.user_metadata?.full_name || 'Nuevo Guía',
                                 avatar: session.user.user_metadata?.avatar_url
                             });
-                            if(error) throw error;
+                            
+                            if (insertError) {
+                                console.error("GuideLayout: Error creating new profile:", insertError);
+                                throw insertError;
+                            }
+                            console.log("GuideLayout: New profile created successfully.");
+                        } else {
+                            console.log("GuideLayout: Existing profile confirmed.");
                         }
+
                         setUser(session.user);
+                        console.log("GuideLayout: User state updated.");
+
                     } else {
+                        console.log("GuideLayout: No session found. Redirecting to /login.");
                         router.push('/login');
                     }
                 } catch (error) {
-                    console.error("Auth state change error:", error);
+                    console.error("GuideLayout: An error occurred in onAuthStateChange logic:", error);
                     router.push('/login');
                 } finally {
+                    console.log("GuideLayout: Setting isLoading to false.");
                     setIsLoading(false);
                 }
             }
         );
 
         return () => {
+            console.log("GuideLayout: Unsubscribing from auth listener.");
             authListener.subscription.unsubscribe();
         };
     }, [supabase, router]);

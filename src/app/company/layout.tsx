@@ -23,38 +23,62 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
     const [isLoading, setIsLoading] = React.useState(true);
 
     React.useEffect(() => {
+        console.log("CompanyLayout: useEffect started.");
         const { data: authListener } = supabase.auth.onAuthStateChange(
             async (event, session) => {
+                console.log("CompanyLayout: Auth state changed. Event:", event);
                 try {
                     if (session) {
-                        const { data: companyProfile } = await supabase
+                        console.log("CompanyLayout: Session found for user:", session.user.email);
+                        
+                        console.log("CompanyLayout: Checking for existing company profile for ID:", session.user.id);
+                        const { data: companyProfile, error: selectError } = await supabase
                             .from('companies')
                             .select('id')
                             .eq('id', session.user.id)
                             .single();
+                        
+                        if(selectError && selectError.code !== 'PGRST116') { // PGRST116: "exact one row not found" which is fine
+                            console.error("CompanyLayout: Error checking for profile:", selectError);
+                            throw selectError;
+                        }
+
+                        console.log("CompanyLayout: Profile check result:", companyProfile);
 
                         if (!companyProfile) {
-                           const { error } = await supabase.from('companies').insert({
+                           console.log("CompanyLayout: No profile found. Creating new company profile...");
+                           const { error: insertError } = await supabase.from('companies').insert({
                                 id: session.user.id,
                                 email: session.user.email,
                                 name: session.user.user_metadata?.full_name || 'Nueva Empresa',
                             });
-                            if (error) throw error;
+                            if (insertError) {
+                                console.error("CompanyLayout: Error creating new profile:", insertError);
+                                throw insertError;
+                            }
+                            console.log("CompanyLayout: New profile created successfully.");
+                        } else {
+                             console.log("CompanyLayout: Existing profile confirmed.");
                         }
                         setUser(session.user);
+                        console.log("CompanyLayout: User state updated.");
+
                     } else {
+                        console.log("CompanyLayout: No session found. Redirecting to /login.");
                         router.push('/login');
                     }
                 } catch(error) {
-                    console.error("Auth state change error in company layout:", error);
+                    console.error("CompanyLayout: An error occurred in onAuthStateChange logic:", error);
                     router.push('/login');
                 } finally {
+                    console.log("CompanyLayout: Setting isLoading to false.");
                     setIsLoading(false);
                 }
             }
         );
 
         return () => {
+            console.log("CompanyLayout: Unsubscribing from auth listener.");
             authListener.subscription.unsubscribe();
         };
     }, [supabase, router]);
