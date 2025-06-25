@@ -3,6 +3,7 @@ export type Guide = {
   id: string; // UUID del usuario
   name: string;
   email: string | null;
+  phone: string | null;
   avatar: string | null;
   specialties: string[] | null;
   languages: string[] | null;

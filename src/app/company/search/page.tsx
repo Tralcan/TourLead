@@ -4,7 +4,7 @@
 import React from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, DollarSign, User, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, DollarSign, User, Loader2, Mail, Phone } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -212,13 +212,13 @@ export default function SearchGuidesPage() {
                 const { data: specialtiesData, error: specialtiesError } = specialtiesRes;
                 if (specialtiesError) throw new Error(`Error fetching specialties: ${specialtiesError.message}`);
                 if (specialtiesData) {
-                    setSpecialtiesList(specialtiesData.map(s => s.name));
+                    setSpecialtiesList(specialtiesData.map(s => s.name).filter(Boolean));
                 }
 
                 const { data: languagesData, error: languagesError } = languagesRes;
                 if (languagesError) throw new Error(`Error fetching languages: ${languagesError.message}`);
                 if (languagesData) {
-                    setLanguagesList(languagesData.map(l => l.name));
+                    setLanguagesList(languagesData.map(l => l.name).filter(Boolean));
                 }
 
                 setFilteredGuides([]);
@@ -364,7 +364,9 @@ export default function SearchGuidesPage() {
                                     </Avatar>
                                     <div>
                                         <CardTitle className="font-headline">{guide.name}</CardTitle>
-                                        <CardDescription>{guide.email}</CardDescription>
+                                        <CardDescription>
+                                            {guide.languages?.join(' • ') || 'Idiomas no especificados'}
+                                        </CardDescription>
                                     </div>
                                 </CardHeader>
                                 <CardContent className="flex-grow space-y-4">
@@ -373,7 +375,19 @@ export default function SearchGuidesPage() {
                                             <Badge key={spec} variant="outline">{spec}</Badge>
                                         ))}
                                     </div>
-                                    <div className="flex justify-between text-sm text-muted-foreground">
+                                    <div className="space-y-1 text-sm text-muted-foreground pt-2">
+                                        <div className="flex items-center gap-2">
+                                            <Mail className="h-4 w-4" />
+                                            <span>{guide.email || 'No disponible'}</span>
+                                        </div>
+                                        {guide.phone && (
+                                            <div className="flex items-center gap-2">
+                                                <Phone className="h-4 w-4" />
+                                                <span>{guide.phone}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex justify-between text-sm text-muted-foreground border-t pt-4">
                                         <div className="flex items-center gap-1">
                                             <DollarSign className="h-4 w-4 text-primary" />
                                             <span>{guide.rate} / día</span>

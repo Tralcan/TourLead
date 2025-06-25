@@ -27,6 +27,7 @@ import { createClient } from "@/lib/supabase/client"
 const profileFormSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
   email: z.string().email(),
+  phone: z.string().optional(),
   specialties: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
   rate: z.coerce.number().min(0, "La tarifa debe ser un número positivo.").optional(),
@@ -50,6 +51,7 @@ export default function GuideProfilePage() {
       defaultValues: {
         name: "",
         email: "",
+        phone: "",
         specialties: [],
         languages: [],
         rate: 0,
@@ -78,6 +80,7 @@ export default function GuideProfilePage() {
           form.reset({
             name: guideData.name || "",
             email: guideData.email || "",
+            phone: guideData.phone || "",
             rate: guideData.rate || 0,
             specialties: guideData.specialties || [],
             languages: guideData.languages || [],
@@ -151,6 +154,7 @@ export default function GuideProfilePage() {
       .update({
         name: data.name,
         email: data.email,
+        phone: data.phone,
         specialties: data.specialties,
         languages: data.languages,
         rate: data.rate,
@@ -204,21 +208,21 @@ export default function GuideProfilePage() {
                 </FormItem>
               )}
             />
-
+            
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                  <FormItem>
+                  <FormLabel>Nombre Completo</FormLabel>
+                  <FormControl>
+                      <Input placeholder="Juan Pérez" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                  </FormItem>
+              )}
+            />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Nombre Completo</FormLabel>
-                    <FormControl>
-                        <Input placeholder="Juan Pérez" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
                 <FormField
                 control={form.control}
                 name="email"
@@ -227,6 +231,19 @@ export default function GuideProfilePage() {
                     <FormLabel>Correo Electrónico</FormLabel>
                     <FormControl>
                         <Input type="email" placeholder="tu@ejemplo.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                 <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Teléfono</FormLabel>
+                    <FormControl>
+                        <Input type="tel" placeholder="+56 9 1234 5678" {...field} value={field.value ?? ''} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
