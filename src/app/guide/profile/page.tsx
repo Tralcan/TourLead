@@ -71,16 +71,19 @@ export default function GuideProfilePage() {
                 <FormField
                 control={form.control}
                 name="avatar"
-                render={({ field }) => (
+                render={({ field }) => {
+                  const { value, ...rest } = field
+                  return (
                     <FormItem className="flex-1">
-                    <FormLabel>Foto de Perfil</FormLabel>
-                    <FormControl>
-                        <Input type="file" {...field} />
-                    </FormControl>
-                    <FormDescription>Sube una foto profesional.</FormDescription>
-                    <FormMessage />
+                      <FormLabel>Foto de Perfil</FormLabel>
+                      <FormControl>
+                        <Input type="file" {...rest} />
+                      </FormControl>
+                      <FormDescription>Sube una foto profesional.</FormDescription>
+                      <FormMessage />
                     </FormItem>
-                )}
+                  )
+                }}
                 />
             </div>
 
