@@ -25,25 +25,32 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
     React.useEffect(() => {
         const { data: authListener } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                if (session) {
-                    const { data: companyProfile } = await supabase
-                        .from('companies')
-                        .select('id')
-                        .eq('id', session.user.id)
-                        .single();
+                try {
+                    if (session) {
+                        const { data: companyProfile } = await supabase
+                            .from('companies')
+                            .select('id')
+                            .eq('id', session.user.id)
+                            .single();
 
-                    if (!companyProfile) {
-                        await supabase.from('companies').insert({
-                            id: session.user.id,
-                            email: session.user.email,
-                            name: session.user.user_metadata?.full_name || 'Nueva Empresa',
-                        });
+                        if (!companyProfile) {
+                           const { error } = await supabase.from('companies').insert({
+                                id: session.user.id,
+                                email: session.user.email,
+                                name: session.user.user_metadata?.full_name || 'Nueva Empresa',
+                            });
+                            if (error) throw error;
+                        }
+                        setUser(session.user);
+                    } else {
+                        router.push('/login');
                     }
-                    setUser(session.user);
-                } else {
+                } catch(error) {
+                    console.error("Auth state change error in company layout:", error);
                     router.push('/login');
+                } finally {
+                    setIsLoading(false);
                 }
-                setIsLoading(false);
             }
         );
 

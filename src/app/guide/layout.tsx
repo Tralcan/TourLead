@@ -26,27 +26,34 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
     React.useEffect(() => {
         const { data: authListener } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                if (session) {
-                    // Check if guide profile exists, create if not
-                    const { data: guideProfile } = await supabase
-                        .from('guides')
-                        .select('id')
-                        .eq('id', session.user.id)
-                        .single();
+                try {
+                    if (session) {
+                        // Check if guide profile exists, create if not
+                        const { data: guideProfile } = await supabase
+                            .from('guides')
+                            .select('id')
+                            .eq('id', session.user.id)
+                            .single();
 
-                    if (!guideProfile) {
-                        await supabase.from('guides').insert({
-                            id: session.user.id,
-                            email: session.user.email,
-                            name: session.user.user_metadata?.full_name || 'Nuevo Guía',
-                            avatar: session.user.user_metadata?.avatar_url
-                        });
+                        if (!guideProfile) {
+                           const { error } = await supabase.from('guides').insert({
+                                id: session.user.id,
+                                email: session.user.email,
+                                name: session.user.user_metadata?.full_name || 'Nuevo Guía',
+                                avatar: session.user.user_metadata?.avatar_url
+                            });
+                            if(error) throw error;
+                        }
+                        setUser(session.user);
+                    } else {
+                        router.push('/login');
                     }
-                    setUser(session.user);
-                } else {
+                } catch (error) {
+                    console.error("Auth state change error:", error);
                     router.push('/login');
+                } finally {
+                    setIsLoading(false);
                 }
-                setIsLoading(false);
             }
         );
 
