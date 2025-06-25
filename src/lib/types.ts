@@ -5,6 +5,7 @@ export type Guide = {
   email: string | null;
   phone: string | null;
   avatar: string | null;
+  summary: string | null;
   specialties: string[] | null;
   languages: string[] | null;
   rate: number | null;

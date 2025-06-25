@@ -20,11 +20,13 @@ const parseDateStringAsLocal = (dateString: string): Date => {
     return new Date(year, month, day);
 };
 
-// Helper to format a local Date object into a YYYY-MM-DD string.
+// Helper to format a local Date object into a YYYY-MM-DD string, avoiding timezone issues.
 const formatLocalDate = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const day = date.getDate().toString().padStart(2, '0');
+  const d = new Date(date);
+  // We use UTC methods to prevent the date from shifting due to the user's local timezone.
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
 

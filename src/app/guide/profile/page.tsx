@@ -18,6 +18,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -28,6 +29,7 @@ const profileFormSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
   email: z.string().email(),
   phone: z.string().optional(),
+  summary: z.string().max(500, "El resumen no puede exceder los 500 caracteres.").optional(),
   specialties: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
   rate: z.coerce.number().min(0, "La tarifa debe ser un número positivo.").optional(),
@@ -53,6 +55,7 @@ export default function GuideProfilePage() {
         name: "",
         email: "",
         phone: "",
+        summary: "",
         specialties: [],
         languages: [],
         rate: 0,
@@ -85,6 +88,7 @@ export default function GuideProfilePage() {
                 name: guideData.name || "",
                 email: guideData.email || "",
                 phone: guideData.phone || "",
+                summary: guideData.summary || "",
                 rate: guideData.rate || 0,
                 specialties: guideData.specialties || [],
                 languages: guideData.languages || [],
@@ -111,7 +115,6 @@ export default function GuideProfilePage() {
             setAllLanguages(languagesData || []);
 
         } catch (error) {
-            console.error("Error completo durante la carga de datos:", error);
             const errorMessage = error instanceof Error ? error.message : "Un error desconocido ocurrió.";
             toast({ title: "Error de Carga", description: `No se pudieron cargar los datos del perfil: ${errorMessage}`, variant: "destructive" });
         } finally {
@@ -165,6 +168,7 @@ export default function GuideProfilePage() {
         name: data.name,
         email: data.email,
         phone: data.phone,
+        summary: data.summary,
         specialties: data.specialties,
         languages: data.languages,
         rate: data.rate,
@@ -260,6 +264,28 @@ export default function GuideProfilePage() {
                 )}
                 />
             </div>
+
+            <FormField
+              control={form.control}
+              name="summary"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Resumen Profesional</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Describe brevemente tu experiencia, estilo como guía y lo que te hace único."
+                      className="resize-none"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Este resumen se mostrará a las empresas en los resultados de búsqueda. Máximo 500 caracteres.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <FormField
               control={form.control}

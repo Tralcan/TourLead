@@ -61,10 +61,12 @@ async function getGuideRating(guideId: string) {
     return result;
 }
 
+// Helper to format a local Date object into a YYYY-MM-DD string, avoiding timezone issues.
 const formatLocalDate = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 };
 
@@ -235,51 +237,39 @@ export default function SearchGuidesPage() {
     const handleSearch = () => {
         setIsSearching(true);
         setHasSearched(true);
-        console.log("--- Iniciando Búsqueda ---");
-        console.log("Filtros:", { specialty, language, startDate: startDate ? formatLocalDate(startDate) : 'N/A', endDate: endDate ? formatLocalDate(endDate) : 'N/A' });
         
         let guides = [...allGuides];
-        console.log(`Paso 0: ${guides.length} guías totales.`);
 
         if (specialty) {
             guides = guides.filter(g => g.specialties?.includes(specialty));
-            console.log(`Paso 1 (Especialidad: ${specialty}): ${guides.length} guías restantes.`);
         }
 
         if (language) {
             guides = guides.filter(g => g.languages?.includes(language));
-            console.log(`Paso 2 (Idioma: ${language}): ${guides.length} guías restantes.`);
         }
 
-        if(startDate && endDate) {
+        if (startDate && endDate) {
+            const requiredDates: string[] = [];
+            let currentDate = new Date(startDate);
+            while (currentDate <= endDate) {
+                requiredDates.push(formatLocalDate(new Date(currentDate)));
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+
             guides = guides.filter(guide => {
-                if(!guide.availability || guide.availability.length === 0) {
+                if (!guide.availability || guide.availability.length === 0) {
                     return false;
                 }
-                
                 const availableDates = new Set(guide.availability.map(d => d.split('T')[0]));
-                
-                let currentDate = new Date(startDate);
-                currentDate.setHours(0, 0, 0, 0);
-
-                let lastDate = new Date(endDate);
-                lastDate.setHours(0, 0, 0, 0);
-
-                while (currentDate <= lastDate) {
-                    const dateToCheck = formatLocalDate(currentDate);
+                for (const dateToCheck of requiredDates) {
                     if (!availableDates.has(dateToCheck)) {
-                        console.log(`[Depuración] Guía ${guide.name} descartado. La fecha requerida ${dateToCheck} no está en su disponibilidad:`, Array.from(availableDates));
-                        return false; 
+                        return false;
                     }
-                    currentDate.setDate(currentDate.getDate() + 1);
                 }
-                
-                return true; 
+                return true;
             });
-            console.log(`Paso 3 (Fechas): ${guides.length} guías restantes.`);
         }
         
-        console.log("--- Búsqueda Finalizada ---");
         setFilteredGuides(guides);
         setIsSearching(false);
     }
@@ -393,13 +383,10 @@ export default function SearchGuidesPage() {
                                             <Badge key={spec} variant="outline">{spec}</Badge>
                                         ))}
                                     </div>
-                                    <div className="space-y-1 text-sm text-muted-foreground pt-2">
-                                        <div className="flex items-center gap-2">
-                                            <Mail className="h-4 w-4" />
-                                            <span>{guide.email || 'No disponible'}</span>
-                                        </div>
+                                    <div className="space-y-2 text-sm text-muted-foreground pt-2">
+                                        {guide.summary && <p>{guide.summary}</p>}
                                         {guide.phone && (
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 pt-2">
                                                 <Phone className="h-4 w-4" />
                                                 <span>{guide.phone}</span>
                                             </div>
