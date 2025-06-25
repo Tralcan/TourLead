@@ -63,10 +63,11 @@ async function getGuideRating(guideId: string) {
 }
 
 const toYYYYMMDD = (date: Date) => {
-    const d = new Date(date);
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().split('T')[0];
-}
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 const offerFormSchema = z.object({
     job_type: z.string().min(1, "El tipo de trabajo es requerido."),
@@ -235,27 +236,20 @@ export default function SearchGuidesPage() {
     const handleSearch = () => {
         setIsSearching(true);
         setHasSearched(true);
-        console.log("--- INICIANDO BÚSQUEDA ---");
-        console.log("Filtros seleccionados:", { startDate, endDate, specialty, language });
         
         let guides = [...allGuides];
-        console.log(`Total de guías antes de filtrar: ${guides.length}`);
 
         if (specialty) {
             guides = guides.filter(g => g.specialties?.includes(specialty));
-            console.log(`Guías restantes después de filtrar por especialidad '${specialty}': ${guides.length}`);
         }
 
         if (language) {
             guides = guides.filter(g => g.languages?.includes(language));
-            console.log(`Guías restantes después de filtrar por idioma '${language}': ${guides.length}`);
         }
 
         if(startDate && endDate) {
-            console.log("Filtrando por fechas:", { start: toYYYYMMDD(startDate), end: toYYYYMMDD(endDate) });
             guides = guides.filter(guide => {
                 if(!guide.availability || guide.availability.length === 0) {
-                    console.log(`Guía ${guide.name} descartado: sin disponibilidad registrada.`);
                     return false;
                 }
                 
@@ -265,19 +259,14 @@ export default function SearchGuidesPage() {
                 while (currentDate <= endDate) {
                     const dateToCheck = toYYYYMMDD(currentDate);
                     if (!availableDates.has(dateToCheck)) {
-                        console.log(`Guía ${guide.name} descartado: no disponible el ${dateToCheck}`);
                         return false; 
                     }
                     currentDate.setDate(currentDate.getDate() + 1);
                 }
-                console.log(`Guía ${guide.name} está disponible en el rango seleccionado.`);
                 return true; 
             });
-            console.log(`Guías restantes después de filtrar por fechas: ${guides.length}`);
         }
         
-        console.log("--- BÚSQUEDA FINALIZADA ---");
-        console.log("Guías encontrados:", guides.map(g => g.name));
         setFilteredGuides(guides);
         setIsSearching(false);
     }
