@@ -2,7 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { CalendarCheck, CalendarDays, Mail, User, PanelLeft, UserCircle, Mountain, LogOut } from 'lucide-react';
+import { CalendarCheck, CalendarDays, Mail, User, PanelLeft, UserCircle, Mountain, LogOut, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -13,6 +13,7 @@ const navItems = [
     { href: '/guide/commitments', icon: CalendarCheck, label: 'Mis Compromisos' },
     { href: '/guide/availability', icon: CalendarDays, label: 'Mi Disponibilidad' },
     { href: '/guide/offers', icon: Mail, label: 'Ofertas de Trabajo' },
+    { href: '/guide/reputation', icon: Star, label: 'Mi Reputación' },
     { href: '/guide/profile', icon: User, label: 'Mi Perfil' },
 ];
 
