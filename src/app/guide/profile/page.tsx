@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
+import React from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -18,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/lib/supabase/client"
 
 const profileFormSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
@@ -30,28 +32,65 @@ const profileFormSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
-const defaultValues: Partial<ProfileFormValues> = {
-  name: "Alicia Rodríguez",
-  email: "alicia.r@email.com",
-  specialties: "Historia, Historia del Arte",
-  languages: "Inglés, Español",
-  rate: 250,
-  avatar: "https://placehold.co/100x100.png"
-}
+// ID del guía logueado (hardcodeado para el ejemplo)
+const LOGGED_IN_GUIDE_ID = "guide1";
 
 export default function GuideProfilePage() {
     const { toast } = useToast()
-    const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileFormSchema),
-    defaultValues,
-    mode: "onChange",
-  })
+    const [defaultValues, setDefaultValues] = React.useState<Partial<ProfileFormValues>>({});
 
-  function onSubmit(data: ProfileFormValues) {
-    toast({
-        title: "Perfil Actualizado",
-        description: "Tu perfil de guía se ha guardado correctamente.",
-    })
+    const form = useForm<ProfileFormValues>({
+      resolver: zodResolver(profileFormSchema),
+      values: defaultValues, // Usar values en lugar de defaultValues para el re-render
+      mode: "onChange",
+    });
+
+    React.useEffect(() => {
+      async function fetchGuideData() {
+        const { data, error } = await supabase
+          .from("guides")
+          .select("*")
+          .eq("id", LOGGED_IN_GUIDE_ID)
+          .single();
+
+        if (data) {
+          const transformedData = {
+            ...data,
+            specialties: data.specialties?.join(", ") || "",
+            languages: data.languages?.join(", ") || "",
+          }
+          setDefaultValues(transformedData);
+          form.reset(transformedData);
+        } else {
+            console.error(error);
+            toast({ title: "Error", description: "No se pudo cargar el perfil del guía.", variant: "destructive" });
+        }
+      }
+      fetchGuideData();
+    }, [form, toast]);
+
+
+  async function onSubmit(data: ProfileFormValues) {
+    const { error } = await supabase
+      .from("guides")
+      .update({
+        name: data.name,
+        email: data.email,
+        specialties: data.specialties.split(",").map(s => s.trim()),
+        languages: data.languages.split(",").map(l => l.trim()),
+        rate: data.rate,
+        // La actualización del avatar (archivo) es más compleja y se omite aquí.
+      })
+      .eq("id", LOGGED_IN_GUIDE_ID);
+    
+    if (error) {
+        toast({ title: "Error", description: "No se pudo actualizar el perfil.", variant: "destructive" });
+    } else {
+        toast({
+            title: "Perfil Actualizado",
+            description: "Tu perfil de guía se ha guardado correctamente.",
+        });
+    }
   }
 
   return (
@@ -61,11 +100,14 @@ export default function GuideProfilePage() {
         <CardDescription>Así es como tu perfil aparecerá a las empresas de tours.</CardDescription>
       </CardHeader>
       <CardContent>
+        {Object.keys(defaultValues).length === 0 ? (
+          <p>Cargando perfil...</p>
+        ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <div className="flex items-center gap-6">
                 <Avatar className="h-24 w-24">
-                    <AvatarImage src={defaultValues.avatar} />
+                    <AvatarImage src={defaultValues.avatar || ''} />
                     <AvatarFallback>{defaultValues.name?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <FormField
@@ -163,6 +205,7 @@ export default function GuideProfilePage() {
             <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">Actualizar Perfil</Button>
           </form>
         </Form>
+        )}
       </CardContent>
     </Card>
   )

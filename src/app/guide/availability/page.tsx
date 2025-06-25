@@ -1,27 +1,78 @@
 "use client"
 
 import * as React from "react"
-import { addDays, isBefore, startOfToday } from "date-fns"
+import { addDays, isBefore, startOfToday, eachDayOfInterval, formatISO } from "date-fns"
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/lib/supabase/client";
 
-const bookedDays = [addDays(new Date(), 5), addDays(new Date(), 6)];
+// ID del guía logueado (hardcodeado para el ejemplo)
+const LOGGED_IN_GUIDE_ID = "guide1";
 
 export default function AvailabilityPage() {
   const today = startOfToday();
   const { toast } = useToast();
-  const [days, setDays] = React.useState<Date[] | undefined>(
-    [addDays(today, 10), addDays(today, 12), addDays(today, 20)]
-  );
+  const [days, setDays] = React.useState<Date[] | undefined>([]);
+  const [bookedDays, setBookedDays] = React.useState<Date[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
 
-  const handleSave = () => {
-    toast({
-        title: "Disponibilidad Guardada",
-        description: "Tu calendario ha sido actualizado correctamente.",
-    })
+  React.useEffect(() => {
+    async function fetchAvailability() {
+        setIsLoading(true);
+        // Obtener disponibilidad guardada
+        const { data: guideData, error: guideError } = await supabase
+            .from('guides')
+            .select('availability')
+            .eq('id', LOGGED_IN_GUIDE_ID)
+            .single();
+
+        if (guideData?.availability) {
+            setDays(guideData.availability.map(d => new Date(d)));
+        }
+        if(guideError) console.error("Error fetching availability:", guideError);
+
+        // Obtener fechas de compromisos
+        const { data: commitmentsData, error: commitmentsError } = await supabase
+            .from('commitments')
+            .select('start_date, end_date')
+            .eq('guide_id', LOGGED_IN_GUIDE_ID)
+            .gt('end_date', new Date().toISOString());
+        
+        if (commitmentsData) {
+            const allBookedDays = commitmentsData.flatMap(c => 
+                eachDayOfInterval({ start: new Date(c.start_date!), end: new Date(c.end_date!) })
+            );
+            setBookedDays(allBookedDays);
+        }
+        if(commitmentsError) console.error("Error fetching commitments:", commitmentsError);
+        setIsLoading(false);
+    }
+    fetchAvailability();
+  }, []);
+
+  const handleSave = async () => {
+    const isoDates = days?.map(day => formatISO(day, { representation: 'date' }));
+    
+    const { error } = await supabase
+      .from('guides')
+      .update({ availability: isoDates })
+      .eq('id', LOGGED_IN_GUIDE_ID);
+
+    if (error) {
+        toast({
+            title: "Error al Guardar",
+            description: "No se pudo actualizar tu calendario.",
+            variant: "destructive"
+        })
+    } else {
+        toast({
+            title: "Disponibilidad Guardada",
+            description: "Tu calendario ha sido actualizado correctamente.",
+        })
+    }
   }
 
   return (
@@ -31,6 +82,7 @@ export default function AvailabilityPage() {
             <CardDescription>Selecciona las fechas en las que estás disponible para trabajar. Las fechas reservadas se muestran en gris.</CardDescription>
         </CardHeader>
       <CardContent className="flex justify-center">
+        {isLoading ? <p>Cargando calendario...</p> : (
         <Calendar
           mode="multiple"
           selected={days}
@@ -51,6 +103,7 @@ export default function AvailabilityPage() {
             },
           }}
         />
+        )}
       </CardContent>
       <CardFooter className="flex justify-between items-center">
         <Button onClick={handleSave} className="bg-accent text-accent-foreground hover:bg-accent/90">Guardar Disponibilidad</Button>

@@ -23,14 +23,86 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { mockGuides } from "@/lib/data";
 import { StarRatingDisplay } from "@/components/star-rating";
+import { supabase } from "@/lib/supabase/client";
+import { Guide } from "@/lib/types";
+
+// Función para calcular rating y reviews de un guía
+async function getGuideRating(guideId: string) {
+    const { data, error } = await supabase
+        .from('commitments')
+        .select('guide_rating')
+        .eq('guide_id', guideId)
+        .not('guide_rating', 'is', null);
+
+    if (error || !data || data.length === 0) {
+        return { rating: 0, reviews: 0 };
+    }
+
+    const totalRating = data.reduce((acc, curr) => acc + (curr.guide_rating || 0), 0);
+    const averageRating = totalRating / data.length;
+    return { rating: parseFloat(averageRating.toFixed(1)), reviews: data.length };
+}
 
 export default function SearchGuidesPage() {
     const [startDate, setStartDate] = React.useState<Date | undefined>();
     const [endDate, setEndDate] = React.useState<Date | undefined>();
+    const [specialty, setSpecialty] = React.useState<string>('');
+    
+    const [allGuides, setAllGuides] = React.useState<Guide[]>([]);
+    const [filteredGuides, setFilteredGuides] = React.useState<Guide[]>([]);
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [specialtiesList, setSpecialtiesList] = React.useState<string[]>([]);
 
-    const specialties = [...new Set(mockGuides.flatMap(g => g.specialties))];
+    React.useEffect(() => {
+        async function fetchGuides() {
+            setIsLoading(true);
+            const { data, error } = await supabase.from('guides').select('*');
+            if (data) {
+                const guidesWithRatings = await Promise.all(
+                    data.map(async (guide) => {
+                        const { rating, reviews } = await getGuideRating(guide.id);
+                        return { ...guide, rating, reviews } as Guide;
+                    })
+                );
+                
+                const allSpecialties = [...new Set(guidesWithRatings.flatMap(g => g.specialties || []))];
+                setSpecialtiesList(allSpecialties);
+
+                setAllGuides(guidesWithRatings);
+                setFilteredGuides(guidesWithRatings);
+            } else {
+                console.error(error);
+            }
+            setIsLoading(false);
+        }
+        fetchGuides();
+    }, []);
+
+    const handleSearch = () => {
+        let guides = [...allGuides];
+        
+        // Filtrar por especialidad
+        if (specialty) {
+            guides = guides.filter(g => g.specialties?.includes(specialty));
+        }
+
+        // Filtrar por fecha (lógica simplificada: verifica si alguna fecha seleccionable está en el rango)
+        if(startDate && endDate) {
+            guides = guides.filter(guide => {
+                if(!guide.availability) return false;
+                const availableDates = guide.availability.map(d => new Date(d).getTime());
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    if (availableDates.includes(d.getTime())) {
+                        return true; // Si encuentra al menos una fecha disponible en el rango, es un match.
+                    }
+                }
+                return false;
+            });
+        }
+        
+        setFilteredGuides(guides);
+    }
 
     return (
         <div className="space-y-6">
@@ -77,29 +149,30 @@ export default function SearchGuidesPage() {
                             </PopoverContent>
                         </Popover>
                         
-                        <Select>
+                        <Select onValueChange={setSpecialty} value={specialty}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Selecciona una especialidad" />
                             </SelectTrigger>
                             <SelectContent>
-                                {specialties.map(spec => <SelectItem key={spec} value={spec}>{spec}</SelectItem>)}
+                                <SelectItem value="">Todas las especialidades</SelectItem>
+                                {specialtiesList.map(spec => <SelectItem key={spec} value={spec}>{spec}</SelectItem>)}
                             </SelectContent>
                         </Select>
 
                     </div>
                 </CardContent>
                 <CardFooter>
-                    <Button className="bg-accent text-accent-foreground hover:bg-accent/90">Buscar Guías</Button>
+                    <Button onClick={handleSearch} className="bg-accent text-accent-foreground hover:bg-accent/90">Buscar Guías</Button>
                 </CardFooter>
             </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {mockGuides.map(guide => (
+                {isLoading ? <p>Cargando guías...</p> : filteredGuides.map(guide => (
                     <Card key={guide.id} className="flex flex-col">
                         <CardHeader className="flex flex-row items-center gap-4">
                             <Avatar className="h-16 w-16">
-                                <AvatarImage src={guide.avatar} alt={guide.name} />
-                                <AvatarFallback>{guide.name.charAt(0)}</AvatarFallback>
+                                <AvatarImage src={guide.avatar ?? ''} alt={guide.name ?? ''} />
+                                <AvatarFallback>{guide.name?.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <div>
                                 <CardTitle className="font-headline">{guide.name}</CardTitle>
@@ -108,7 +181,7 @@ export default function SearchGuidesPage() {
                         </CardHeader>
                         <CardContent className="flex-grow space-y-4">
                             <div className="flex flex-wrap gap-2">
-                                {guide.specialties.map(spec => (
+                                {guide.specialties?.map(spec => (
                                     <Badge key={spec} variant="outline">{spec}</Badge>
                                 ))}
                             </div>
@@ -129,6 +202,12 @@ export default function SearchGuidesPage() {
                     </Card>
                 ))}
             </div>
+            {!isLoading && filteredGuides.length === 0 && (
+                <Card className="col-span-full text-center p-8">
+                    <CardTitle>No se encontraron guías</CardTitle>
+                    <CardDescription>Prueba con otros filtros de búsqueda.</CardDescription>
+                </Card>
+            )}
         </div>
     );
 }

@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
+import React from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -18,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/lib/supabase/client"
 
 const profileFormSchema = z.object({
   name: z.string().min(2, "El nombre de la empresa debe tener al menos 2 caracteres."),
@@ -28,27 +30,62 @@ const profileFormSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
-// This can be fetched from an API
-const defaultValues: Partial<ProfileFormValues> = {
-  name: "Buscadores de Aventuras S.A.",
-  email: "contacto@buscadoresdeaventuras.com",
-  specialties: "Senderismo, Ciclismo de Montaña, Kayak",
-  details: "Proveedor líder de tours de aventura al aire libre durante más de 15 años. Nos enfocamos en experiencias sostenibles y emocionantes.",
-}
+// ID de la compañía logueada (hardcodeado para el ejemplo)
+const LOGGED_IN_COMPANY_ID = "comp1";
 
 export default function CompanyProfilePage() {
     const { toast } = useToast()
-  const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileFormSchema),
-    defaultValues,
-    mode: "onChange",
-  })
+    const [defaultValues, setDefaultValues] = React.useState<Partial<ProfileFormValues>>({});
 
-  function onSubmit(data: ProfileFormValues) {
-    toast({
-      title: "Perfil Actualizado",
-      description: "El perfil de tu empresa se ha guardado correctamente.",
+    const form = useForm<ProfileFormValues>({
+        resolver: zodResolver(profileFormSchema),
+        values: defaultValues,
+        mode: "onChange",
     })
+
+    React.useEffect(() => {
+        async function fetchCompanyData() {
+            const { data, error } = await supabase
+                .from("companies")
+                .select("*")
+                .eq("id", LOGGED_IN_COMPANY_ID)
+                .single();
+
+            if (data) {
+                const transformedData = {
+                    ...data,
+                    specialties: data.specialties?.join(", ") || "",
+                }
+                setDefaultValues(transformedData);
+                form.reset(transformedData);
+            } else {
+                console.error(error);
+                toast({ title: "Error", description: "No se pudo cargar el perfil de la empresa.", variant: "destructive" });
+            }
+        }
+        fetchCompanyData();
+    }, [form, toast]);
+
+
+  async function onSubmit(data: ProfileFormValues) {
+    const { error } = await supabase
+      .from('companies')
+      .update({
+        name: data.name,
+        email: data.email,
+        specialties: data.specialties.split(',').map(s => s.trim()),
+        details: data.details,
+      })
+      .eq('id', LOGGED_IN_COMPANY_ID)
+
+    if (error) {
+        toast({ title: "Error", description: "No se pudo actualizar el perfil.", variant: "destructive" });
+    } else {
+        toast({
+          title: "Perfil Actualizado",
+          description: "El perfil de tu empresa se ha guardado correctamente.",
+        })
+    }
   }
 
   return (
@@ -58,6 +95,9 @@ export default function CompanyProfilePage() {
         <CardDescription>Administra la información de tu empresa. Así es como aparecerás ante los guías.</CardDescription>
       </CardHeader>
       <CardContent>
+         {Object.keys(defaultValues).length === 0 ? (
+          <p>Cargando perfil...</p>
+        ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <FormField
@@ -122,6 +162,7 @@ export default function CompanyProfilePage() {
             <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">Actualizar Perfil</Button>
           </form>
         </Form>
+        )}
       </CardContent>
     </Card>
   )

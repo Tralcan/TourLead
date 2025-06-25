@@ -1,48 +1,145 @@
-
 'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { mockOffers } from "@/lib/data";
+import { JobOffer } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Check, X } from "lucide-react";
 import { StarRatingDisplay } from "@/components/star-rating";
+import React from "react";
+import { supabase } from "@/lib/supabase/client";
+
+// ID del guía logueado (hardcodeado para el ejemplo)
+const LOGGED_IN_GUIDE_ID = "guide2";
+
+async function getCompanyRating(companyId: string) {
+    const { data, error } = await supabase
+        .from('commitments')
+        .select('company_rating')
+        .eq('company_id', companyId)
+        .not('company_rating', 'is', null);
+
+    if (error || !data || data.length === 0) {
+        return { rating: 0, reviews: 0 };
+    }
+
+    const totalRating = data.reduce((acc, curr) => acc + (curr.company_rating || 0), 0);
+    const averageRating = totalRating / data.length;
+    return { rating: averageRating, reviews: data.length };
+}
+
 
 export default function OffersPage() {
     const { toast } = useToast();
+    const [offers, setOffers] = React.useState<JobOffer[]>([]);
+    const [isLoading, setIsLoading] = React.useState(true);
 
-    const handleAccept = (companyName: string) => {
-        toast({
-            title: "¡Oferta Aceptada!",
-            description: `Ahora estás reservado con ${companyName}. Tu calendario ha sido actualizado.`,
-        });
+    const fetchOffers = React.useCallback(async () => {
+        setIsLoading(true);
+        const { data, error } = await supabase
+            .from('offers')
+            .select(`
+                *,
+                company:companies(*)
+            `)
+            .eq('guide_id', LOGGED_IN_GUIDE_ID)
+            .eq('status', 'pending');
+
+        if (data) {
+            const offersWithRatings = await Promise.all(data.map(async (offer) => {
+                const company = offer.company as any;
+                const { rating, reviews } = await getCompanyRating(company.id);
+                return {
+                    ...offer,
+                    startDate: new Date(offer.start_date!),
+                    endDate: new Date(offer.end_date!),
+                    company: { ...company, rating, reviews }
+                } as unknown as JobOffer;
+            }));
+            setOffers(offersWithRatings);
+        } else {
+            console.error(error);
+        }
+        setIsLoading(false);
+    }, []);
+
+    React.useEffect(() => {
+        fetchOffers();
+    }, [fetchOffers]);
+
+    const handleAccept = async (offer: JobOffer) => {
+        // 1. Actualizar estado de la oferta a 'accepted'
+        const { error: updateError } = await supabase
+            .from('offers')
+            .update({ status: 'accepted' })
+            .eq('id', offer.id);
+
+        if (updateError) {
+            toast({ title: "Error", description: "No se pudo aceptar la oferta.", variant: "destructive" });
+            return;
+        }
+
+        // 2. Crear un nuevo compromiso
+        const { error: insertError } = await supabase
+            .from('commitments')
+            .insert({
+                guide_id: offer.guide_id,
+                company_id: offer.company.id,
+                job_type: offer.job_type,
+                start_date: format(offer.startDate, 'yyyy-MM-dd'),
+                end_date: format(offer.endDate, 'yyyy-MM-dd'),
+            });
+        
+        if (insertError) {
+             toast({ title: "Error", description: "No se pudo crear el compromiso.", variant: "destructive" });
+             // Opcional: revertir el estado de la oferta si la inserción falla
+        } else {
+            toast({
+                title: "¡Oferta Aceptada!",
+                description: `Ahora estás reservado con ${offer.company.name}. Tu calendario ha sido actualizado.`,
+            });
+            fetchOffers(); // Recargar ofertas
+        }
     }
 
-    const handleDecline = (companyName: string) => {
-        toast({
-            title: "Oferta Rechazada",
-            description: `Has rechazado la oferta de ${companyName}.`,
-            variant: "destructive",
-        })
+    const handleDecline = async (offer: JobOffer) => {
+        const { error } = await supabase
+            .from('offers')
+            .update({ status: 'rejected' })
+            .eq('id', offer.id);
+        
+        if(error) {
+            toast({ title: "Error", description: "No se pudo rechazar la oferta.", variant: "destructive" });
+        } else {
+            toast({
+                title: "Oferta Rechazada",
+                description: `Has rechazado la oferta de ${offer.company.name}.`,
+            });
+            fetchOffers(); // Recargar ofertas
+        }
+    }
+    
+    if (isLoading) {
+        return <p>Cargando ofertas...</p>
     }
 
     return (
         <div className="space-y-6">
-            {mockOffers.map(offer => (
+            {offers.map(offer => (
                 <Card key={offer.id}>
                     <CardHeader>
                        <div className="flex flex-row items-start gap-4">
                             <Avatar className="h-12 w-12">
-                                <AvatarImage src={offer.company.avatar} alt={offer.company.name} />
-                                <AvatarFallback>{offer.company.name.charAt(0)}</AvatarFallback>
+                                <AvatarImage src={offer.company.avatar ?? ''} alt={offer.company.name ?? ''} />
+                                <AvatarFallback>{offer.company.name?.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
                                 <div className="flex justify-between items-start">
                                     <div>
-                                        <CardTitle className="font-headline">{offer.jobType}</CardTitle>
+                                        <CardTitle className="font-headline">{offer.job_type}</CardTitle>
                                         <CardDescription>De {offer.company.name}</CardDescription>
                                     </div>
                                     <StarRatingDisplay rating={offer.company.rating} reviews={offer.company.reviews} />
@@ -55,18 +152,18 @@ export default function OffersPage() {
                         <p className="text-muted-foreground">{offer.description}</p>
                     </CardContent>
                     <CardFooter className="gap-4">
-                        <Button onClick={() => handleAccept(offer.company.name)} className="bg-green-500 hover:bg-green-600 text-white">
+                        <Button onClick={() => handleAccept(offer)} className="bg-green-500 hover:bg-green-600 text-white">
                             <Check className="mr-2 h-4 w-4" />
                             Aceptar
                         </Button>
-                        <Button onClick={() => handleDecline(offer.company.name)} variant="destructive">
+                        <Button onClick={() => handleDecline(offer)} variant="destructive">
                             <X className="mr-2 h-4 w-4" />
                             Rechazar
                         </Button>
                     </CardFooter>
                 </Card>
             ))}
-            {mockOffers.length === 0 && (
+            {offers.length === 0 && (
                 <Card className="text-center">
                     <CardHeader>
                         <CardTitle>No hay Ofertas Pendientes</CardTitle>

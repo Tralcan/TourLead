@@ -12,31 +12,80 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { mockGuides as initialMockGuides } from "@/lib/data";
 import { format, isPast } from "date-fns";
 import { es } from "date-fns/locale";
 import { RateEntity } from "@/components/star-rating";
-import { Guide } from "@/lib/types";
+import { supabase } from "@/lib/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+// ID de la compañía logueada (hardcodeado para el ejemplo)
+const LOGGED_IN_COMPANY_ID = "comp1";
+
+type HiredGuide = {
+    id: string;
+    guide: {
+        id: string;
+        name: string | null;
+        email: string | null;
+        avatar: string | null;
+        specialties: string[] | null;
+    };
+    job_type: string | null;
+    start_date: string;
+    end_date: string;
+    guide_rating?: number | null;
+}
 
 export default function HiredGuidesPage() {
-    const [hiredGuides, setHiredGuides] = React.useState<Guide[]>(() => 
-        initialMockGuides.filter(g => g.commitments.length > 0)
-    );
+    const { toast } = useToast();
+    const [hiredGuides, setHiredGuides] = React.useState<HiredGuide[]>([]);
+    const [isLoading, setIsLoading] = React.useState(true);
 
-    const handleRateGuide = (guideId: string, commitmentId: string, rating: number) => {
-        setHiredGuides(currentGuides => 
-            currentGuides.map(guide => {
-                if (guide.id === guideId) {
-                    return {
-                        ...guide,
-                        commitments: guide.commitments.map(c => 
-                            c.id === commitmentId ? { ...c, guideRating: rating } : c
-                        ),
-                    };
-                }
-                return guide;
-            })
-        );
+    const fetchHiredGuides = React.useCallback(async () => {
+        setIsLoading(true);
+        const { data, error } = await supabase
+            .from('commitments')
+            .select(`
+                id,
+                job_type,
+                start_date,
+                end_date,
+                guide_rating,
+                guide:guides (
+                    id,
+                    name,
+                    email,
+                    avatar,
+                    specialties
+                )
+            `)
+            .eq('company_id', LOGGED_IN_COMPANY_ID);
+
+        if (data) {
+            setHiredGuides(data as HiredGuide[]);
+        } else {
+            console.error(error);
+            toast({ title: "Error", description: "No se pudieron cargar los guías contratados.", variant: "destructive" });
+        }
+        setIsLoading(false);
+    }, [toast]);
+
+    React.useEffect(() => {
+        fetchHiredGuides();
+    }, [fetchHiredGuides]);
+
+    const handleRateGuide = async (commitmentId: string, rating: number) => {
+        const { error } = await supabase
+            .from('commitments')
+            .update({ guide_rating: rating })
+            .eq('id', commitmentId);
+
+        if (error) {
+            toast({ title: "Error", description: "No se pudo guardar la calificación.", variant: "destructive" });
+        } else {
+            toast({ title: "Éxito", description: "Calificación guardada correctamente." });
+            fetchHiredGuides(); // Recargar datos para mostrar la nueva calificación
+        }
     };
 
     return (
@@ -57,44 +106,53 @@ export default function HiredGuidesPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {hiredGuides.flatMap(guide => 
-                            guide.commitments.map(commitment => (
-                                <TableRow key={commitment.id}>
-                                    <TableCell>
-                                        <div className="flex items-center gap-4">
-                                            <Avatar>
-                                                <AvatarImage src={guide.avatar} alt={guide.name} />
-                                                <AvatarFallback>{guide.name.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                                <div className="font-medium">{guide.name}</div>
-                                                <div className="text-sm text-muted-foreground">{guide.email}</div>
-                                            </div>
+                        {isLoading ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center">Cargando...</TableCell>
+                            </TableRow>
+                        ) : hiredGuides.map(commitment => (
+                            <TableRow key={commitment.id}>
+                                <TableCell>
+                                    <div className="flex items-center gap-4">
+                                        <Avatar>
+                                            <AvatarImage src={commitment.guide.avatar ?? ''} alt={commitment.guide.name ?? ''} />
+                                            <AvatarFallback>{commitment.guide.name?.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <div className="font-medium">{commitment.guide.name}</div>
+                                            <div className="text-sm text-muted-foreground">{commitment.guide.email}</div>
                                         </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        {format(commitment.startDate, "d MMM, yyyy", { locale: es })} - {format(commitment.endDate, "d MMM, yyyy", { locale: es })}
-                                    </TableCell>
-                                    <TableCell>{commitment.jobType}</TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-wrap gap-1">
-                                            {guide.specialties.map(spec => <Badge key={spec} variant="secondary">{spec}</Badge>)}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {isPast(commitment.endDate) ? (
-                                            <RateEntity 
-                                                entityName={guide.name} 
-                                                currentRating={commitment.guideRating}
-                                                onSave={(rating) => handleRateGuide(guide.id, commitment.id, rating)}
-                                            />
-                                        ) : (
-                                            <Badge variant="outline">Próximo</Badge>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    {format(new Date(commitment.start_date), "d MMM, yyyy", { locale: es })} - {format(new Date(commitment.end_date), "d MMM, yyyy", { locale: es })}
+                                </TableCell>
+                                <TableCell>{commitment.job_type}</TableCell>
+                                <TableCell>
+                                    <div className="flex flex-wrap gap-1">
+                                        {commitment.guide.specialties?.map(spec => <Badge key={spec} variant="secondary">{spec}</Badge>)}
+                                    </div>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    {isPast(new Date(commitment.end_date)) ? (
+                                        <RateEntity 
+                                            entityName={commitment.guide.name ?? 'Guía'} 
+                                            currentRating={commitment.guide_rating ?? undefined}
+                                            onSave={(rating) => handleRateGuide(commitment.id, rating)}
+                                        />
+                                    ) : (
+                                        <Badge variant="outline">Próximo</Badge>
+                                    )}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                         {!isLoading && hiredGuides.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                                    No has contratado guías.
+                                </TableCell>
+                            </TableRow>
+                         )}
                     </TableBody>
                 </Table>
             </CardContent>

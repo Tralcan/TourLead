@@ -2,11 +2,11 @@
 export type Guide = {
   id: string;
   name: string;
-  email: string;
-  avatar: string;
-  specialties: string[];
-  languages: string[];
-  rate: number;
+  email: string | null;
+  avatar: string | null;
+  specialties: string[] | null;
+  languages: string[] | null;
+  rate: number | null;
   rating: number;
   reviews: number;
   availability: Date[];
@@ -16,20 +16,20 @@ export type Guide = {
 export type Company = {
   id: string;
   name: string;
-  email: string;
-  avatar: string;
-  specialties: string[];
-  details: string;
+  email: string | null;
+  avatar: string | null;
+  specialties: string[] | null;
+  details: string | null;
   rating: number;
   reviews: number;
 };
 
 export type JobOffer = {
   id: string;
-  company: Pick<Company, 'id' | 'name' | 'avatar' | 'rating' | 'reviews'>;
-  guideId: string;
-  jobType: string;
-  description: string;
+  company: Company;
+  guide_id: string;
+  job_type: string | null;
+  description: string | null;
   startDate: Date;
   endDate: Date;
   status: 'pending' | 'accepted' | 'rejected';
@@ -38,9 +38,11 @@ export type JobOffer = {
 export type Commitment = {
   id: string;
   company: Pick<Company, 'id' | 'name' | 'email'>;
-  jobType: string;
+  company_id: string;
+  guide_id: string;
+  job_type: string | null;
   startDate: Date;
   endDate: Date;
-  guideRating?: number;
-  companyRating?: number;
+  guide_rating?: number | null;
+  company_rating?: number | null;
 };
