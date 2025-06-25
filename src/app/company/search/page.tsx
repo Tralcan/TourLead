@@ -64,10 +64,9 @@ async function getGuideRating(guideId: string) {
 }
 
 const formatLocalDate = (date: Date): string => {
-    const d = new Date(date.valueOf() + date.getTimezoneOffset() * 60 * 1000);
-    const year = d.getUTCFullYear();
-    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(d.getUTCDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 };
 
@@ -498,7 +497,6 @@ export default function SearchGuidesPage() {
                                 </CardContent>
                                 <CardFooter>
                                     <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => handleOfferClick(guide)}>
-                                        <User className="mr-2 h-4 w-4" />
                                         Ofertar
                                     </Button>
                                 </CardFooter>
@@ -538,3 +536,5 @@ export default function SearchGuidesPage() {
         </div>
     );
 }
+
+    
