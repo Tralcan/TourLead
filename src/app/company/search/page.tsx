@@ -4,7 +4,7 @@
 import React from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, DollarSign, User, Loader2, Mail, Phone } from "lucide-react";
+import { Calendar as CalendarIcon, DollarSign, User, Loader2 } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { createOffer } from "@/app/actions/offers";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 
 const supabase = createClient();
@@ -61,7 +62,6 @@ async function getGuideRating(guideId: string) {
     return result;
 }
 
-// Helper to format a local Date object into a YYYY-MM-DD string, avoiding timezone issues.
 const formatLocalDate = (date: Date): string => {
     const d = new Date(date);
     const year = d.getFullYear();
@@ -75,6 +75,90 @@ const offerFormSchema = z.object({
     description: z.string().min(10, "La descripción debe tener al menos 10 caracteres.").max(500, "La descripción no puede exceder los 500 caracteres."),
   });
 type OfferFormValues = z.infer<typeof offerFormSchema>;
+
+type RatingDetail = {
+    id: number;
+    job_type: string | null;
+    guide_rating: number | null;
+    company: { name: string | null } | null;
+};
+
+function RatingDetailsDialog({ guide, isOpen, onOpenChange }: { guide: Guide, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+    const [ratings, setRatings] = React.useState<RatingDetail[]>([]);
+    const [isLoading, setIsLoading] = React.useState(true);
+    const { toast } = useToast();
+
+    React.useEffect(() => {
+        if (!isOpen) return;
+
+        async function fetchRatingDetails() {
+            setIsLoading(true);
+            const { data, error } = await supabase
+                .from('commitments')
+                .select(`
+                    id,
+                    job_type,
+                    guide_rating,
+                    company:companies (
+                        name
+                    )
+                `)
+                .eq('guide_id', guide.id)
+                .not('guide_rating', 'is', null);
+            
+            if (error) {
+                console.error("Error al obtener detalles de calificación:", error);
+                toast({ title: "Error", description: "No se pudieron cargar los detalles de las calificaciones.", variant: "destructive" });
+            } else if (data) {
+                setRatings(data as RatingDetail[]);
+            }
+            setIsLoading(false);
+        }
+
+        fetchRatingDetails();
+    }, [guide.id, isOpen, toast]);
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Calificaciones de {guide.name}</DialogTitle>
+                    <DialogDescription>
+                        Detalle de los trabajos anteriores y las calificaciones recibidas.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="max-h-[60vh] overflow-y-auto">
+                    {isLoading ? (
+                        <p className="text-center">Cargando calificaciones...</p>
+                    ) : ratings.length > 0 ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Trabajo</TableHead>
+                                    <TableHead>Empresa</TableHead>
+                                    <TableHead className="text-right">Calificación</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {ratings.map(rating => (
+                                    <TableRow key={rating.id}>
+                                        <TableCell>{rating.job_type || 'N/A'}</TableCell>
+                                        <TableCell>{rating.company?.name || 'N/A'}</TableCell>
+                                        <TableCell className="text-right">
+                                            <StarRatingDisplay rating={rating.guide_rating ?? 0} />
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : (
+                        <p className="text-muted-foreground text-center">Este guía aún no tiene calificaciones.</p>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 function OfferDialog({ 
     guide, 
@@ -188,6 +272,9 @@ export default function SearchGuidesPage() {
     const [selectedGuide, setSelectedGuide] = React.useState<Guide | null>(null);
     const [isOfferDialogOpen, setIsOfferDialogOpen] = React.useState(false);
 
+    const [selectedGuideForRatings, setSelectedGuideForRatings] = React.useState<Guide | null>(null);
+    const [isRatingDialogOpen, setIsRatingDialogOpen] = React.useState(false);
+
     React.useEffect(() => {
         async function fetchData() {
             setIsLoading(true);
@@ -281,6 +368,13 @@ export default function SearchGuidesPage() {
         }
         setSelectedGuide(guide);
         setIsOfferDialogOpen(true);
+    };
+
+    const handleRatingClick = (guide: Guide) => {
+        if ((guide.reviews ?? 0) > 0) {
+            setSelectedGuideForRatings(guide);
+            setIsRatingDialogOpen(true);
+        }
     };
 
     return (
@@ -385,25 +479,26 @@ export default function SearchGuidesPage() {
                                     </div>
                                     <div className="space-y-2 text-sm text-muted-foreground pt-2">
                                         {guide.summary && <p>{guide.summary}</p>}
-                                        {guide.phone && (
-                                            <div className="flex items-center gap-2 pt-2">
-                                                <Phone className="h-4 w-4" />
-                                                <span>{guide.phone}</span>
-                                            </div>
-                                        )}
                                     </div>
                                     <div className="flex justify-between text-sm text-muted-foreground border-t pt-4">
                                         <div className="flex items-center gap-1">
                                             <DollarSign className="h-4 w-4 text-primary" />
                                             <span>{guide.rate} / día</span>
                                         </div>
-                                        <StarRatingDisplay rating={guide.rating} reviews={guide.reviews} />
+                                        <button
+                                            onClick={() => handleRatingClick(guide)}
+                                            disabled={(guide.reviews ?? 0) === 0}
+                                            className="disabled:cursor-not-allowed"
+                                            aria-label="Ver detalles de calificaciones"
+                                        >
+                                            <StarRatingDisplay rating={guide.rating} reviews={guide.reviews} />
+                                        </button>
                                     </div>
                                 </CardContent>
                                 <CardFooter>
                                     <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => handleOfferClick(guide)}>
                                         <User className="mr-2 h-4 w-4" />
-                                        Ver Perfil y Ofertar
+                                        Ofertar
                                     </Button>
                                 </CardFooter>
                             </Card>
@@ -429,6 +524,14 @@ export default function SearchGuidesPage() {
                     endDate={endDate}
                     isOpen={isOfferDialogOpen}
                     onOpenChange={setIsOfferDialogOpen}
+                />
+            )}
+
+            {selectedGuideForRatings && (
+                <RatingDetailsDialog
+                    guide={selectedGuideForRatings}
+                    isOpen={isRatingDialogOpen}
+                    onOpenChange={setIsRatingDialogOpen}
                 />
             )}
         </div>
