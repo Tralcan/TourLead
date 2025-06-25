@@ -24,26 +24,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 
-const allSpecialties = [
-  { id: 'senderismo', label: 'Senderismo' },
-  { id: 'historia', label: 'Historia' },
-  { id: 'arte', label: 'Arte' },
-  { id: 'gastronomia', label: 'Gastronomía' },
-  { id: 'aventura', label: 'Aventura' },
-  { id: 'naturaleza', label: 'Naturaleza' },
-  { id: 'urbano', label: 'Tours Urbanos' },
-  { id: 'fotografia', label: 'Fotografía' },
-];
-
-const allLanguages = [
-  { id: 'espanol', label: 'Español' },
-  { id: 'ingles', label: 'Inglés' },
-  { id: 'frances', label: 'Francés' },
-  { id: 'aleman', label: 'Alemán' },
-  { id: 'italiano', label: 'Italiano' },
-  { id: 'portugues', label: 'Portugués' },
-];
-
 const profileFormSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
   email: z.string().email(),
@@ -62,6 +42,8 @@ export default function GuideProfilePage() {
     const [isLoading, setIsLoading] = React.useState(true);
     const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
     const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
+    const [allSpecialties, setAllSpecialties] = React.useState<{ name: string }[]>([]);
+    const [allLanguages, setAllLanguages] = React.useState<{ name: string }[]>([]);
 
     const form = useForm<ProfileFormValues>({
       resolver: zodResolver(profileFormSchema),
@@ -85,26 +67,44 @@ export default function GuideProfilePage() {
             return;
         }
 
-        const { data, error } = await supabase
-          .from("guides")
-          .select("*")
-          .eq("id", user.id)
-          .single();
+        const [guideResponse, specialtiesResponse, languagesResponse] = await Promise.all([
+            supabase.from("guides").select("*").eq("id", user.id).single(),
+            supabase.from('expertise').select('name').eq('state', true),
+            supabase.from('languaje').select('name')
+        ]);
 
-        if (data) {
+        const { data: guideData, error: guideError } = guideResponse;
+        if (guideData) {
           form.reset({
-            name: data.name || "",
-            email: data.email || "",
-            rate: data.rate || 0,
-            specialties: data.specialties || [],
-            languages: data.languages || [],
+            name: guideData.name || "",
+            email: guideData.email || "",
+            rate: guideData.rate || 0,
+            specialties: guideData.specialties || [],
+            languages: guideData.languages || [],
           });
-          setAvatarUrl(data.avatar);
-          setAvatarPreview(data.avatar);
-        } else if (error) {
-            console.error(error);
+          setAvatarUrl(guideData.avatar);
+          setAvatarPreview(guideData.avatar);
+        } else if (guideError) {
+            console.error("Error fetching guide profile:", guideError);
             toast({ title: "Error", description: "No se pudo cargar el perfil del guía.", variant: "destructive" });
         }
+
+        const { data: specialtiesData, error: specialtiesError } = specialtiesResponse;
+        if (specialtiesData) {
+            setAllSpecialties(specialtiesData);
+        } else {
+            console.error("Error fetching specialties:", specialtiesError);
+            toast({ title: "Error", description: "No se pudieron cargar las especialidades.", variant: "destructive" });
+        }
+
+        const { data: languagesData, error: languagesError } = languagesResponse;
+        if (languagesData) {
+            setAllLanguages(languagesData);
+        } else {
+            console.error("Error fetching languages:", languagesError);
+            toast({ title: "Error", description: "No se pudieron cargar los idiomas.", variant: "destructive" });
+        }
+        
         setIsLoading(false);
       }
       fetchGuideData();
@@ -243,23 +243,23 @@ export default function GuideProfilePage() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 rounded-md border p-4">
                     {allSpecialties.map((item) => (
                       <FormField
-                        key={item.id}
+                        key={item.name}
                         control={form.control}
                         name="specialties"
                         render={({ field }) => (
                           <FormItem className="flex flex-row items-center space-x-3 space-y-0">
                             <FormControl>
                               <Checkbox
-                                checked={field.value?.includes(item.id)}
+                                checked={field.value?.includes(item.name)}
                                 onCheckedChange={(checked) => {
                                   const currentValue = field.value || [];
                                   return checked
-                                    ? field.onChange([...currentValue, item.id])
-                                    : field.onChange(currentValue.filter((v) => v !== item.id));
+                                    ? field.onChange([...currentValue, item.name])
+                                    : field.onChange(currentValue.filter((v) => v !== item.name));
                                 }}
                               />
                             </FormControl>
-                            <FormLabel className="font-normal text-sm">{item.label}</FormLabel>
+                            <FormLabel className="font-normal text-sm">{item.name}</FormLabel>
                           </FormItem>
                         )}
                       />
@@ -279,23 +279,23 @@ export default function GuideProfilePage() {
                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 rounded-md border p-4">
                     {allLanguages.map((item) => (
                       <FormField
-                        key={item.id}
+                        key={item.name}
                         control={form.control}
                         name="languages"
                         render={({ field }) => (
                           <FormItem className="flex flex-row items-center space-x-3 space-y-0">
                             <FormControl>
                               <Checkbox
-                                checked={field.value?.includes(item.id)}
+                                checked={field.value?.includes(item.name)}
                                 onCheckedChange={(checked) => {
                                   const currentValue = field.value || [];
                                   return checked
-                                    ? field.onChange([...currentValue, item.id])
-                                    : field.onChange(currentValue.filter((v) => v !== item.id));
+                                    ? field.onChange([...currentValue, item.name])
+                                    : field.onChange(currentValue.filter((v) => v !== item.name));
                                 }}
                               />
                             </FormControl>
-                            <FormLabel className="font-normal text-sm">{item.label}</FormLabel>
+                            <FormLabel className="font-normal text-sm">{item.name}</FormLabel>
                           </FormItem>
                         )}
                       />

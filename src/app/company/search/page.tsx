@@ -187,17 +187,17 @@ export default function SearchGuidesPage() {
     const [isOfferDialogOpen, setIsOfferDialogOpen] = React.useState(false);
 
     React.useEffect(() => {
-        async function fetchGuides() {
+        async function fetchData() {
             setIsLoading(true);
             try {
-                const { data: guidesData, error: guidesError } = await supabase.from('guides').select('*');
+                const [guidesRes, specialtiesRes, languagesRes] = await Promise.all([
+                    supabase.from('guides').select('*'),
+                    supabase.from('expertise').select('name').eq('state', true),
+                    supabase.from('languaje').select('name')
+                ]);
 
-                if (guidesError) {
-                    console.error("SearchPage: Fallo al obtener guías:", guidesError);
-                    toast({ title: "Error", description: "No se pudieron cargar los guías.", variant: "destructive" });
-                    setIsLoading(false);
-                    return; 
-                }
+                const { data: guidesData, error: guidesError } = guidesRes;
+                if (guidesError) throw new Error(`Error fetching guides: ${guidesError.message}`);
 
                 if (guidesData) {
                     const guidesWithRatings = await Promise.all(
@@ -206,24 +206,30 @@ export default function SearchGuidesPage() {
                             return { ...guide, rating, reviews } as Guide;
                         })
                     );
-                    
-                    const allSpecialties = [...new Set(guidesWithRatings.flatMap(g => g.specialties || []))].filter(Boolean);
-                    setSpecialtiesList(allSpecialties);
-
-                    const allLanguages = [...new Set(guidesWithRatings.flatMap(g => g.languages || []))].filter(Boolean);
-                    setLanguagesList(allLanguages);
-
                     setAllGuides(guidesWithRatings);
-                    setFilteredGuides([]);
                 }
+
+                const { data: specialtiesData, error: specialtiesError } = specialtiesRes;
+                if (specialtiesError) throw new Error(`Error fetching specialties: ${specialtiesError.message}`);
+                if (specialtiesData) {
+                    setSpecialtiesList(specialtiesData.map(s => s.name));
+                }
+
+                const { data: languagesData, error: languagesError } = languagesRes;
+                if (languagesError) throw new Error(`Error fetching languages: ${languagesError.message}`);
+                if (languagesData) {
+                    setLanguagesList(languagesData.map(l => l.name));
+                }
+
+                setFilteredGuides([]);
             } catch (error) {
-                console.error("SearchPage: Ocurrió un error inesperado al obtener guías:", error);
-                toast({ title: "Error", description: "Ocurrió un error inesperado al obtener guías.", variant: "destructive" });
+                console.error("SearchPage: Ocurrió un error inesperado al obtener los datos:", error);
+                toast({ title: "Error", description: "Ocurrió un error inesperado al cargar los datos de búsqueda.", variant: "destructive" });
             } finally {
                 setIsLoading(false);
             }
         }
-        fetchGuides();
+        fetchData();
     }, [toast]);
 
     const handleSearch = () => {
@@ -248,11 +254,11 @@ export default function SearchGuidesPage() {
                 let currentDate = new Date(startDate);
                 while (currentDate <= endDate) {
                     if (!availableDates.has(toYYYYMMDD(currentDate))) {
-                        return false; // If any date in the range is not available, exclude the guide
+                        return false; 
                     }
                     currentDate.setDate(currentDate.getDate() + 1);
                 }
-                return true; // All dates in the range are available
+                return true; 
             });
         }
         
