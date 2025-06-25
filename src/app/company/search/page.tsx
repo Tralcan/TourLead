@@ -36,7 +36,13 @@ async function getGuideRating(guideId: string) {
         .eq('guide_id', guideId)
         .not('guide_rating', 'is', null);
 
-    if (error || !data || data.length === 0) {
+    if (error) {
+        // Log the error but don't throw, to avoid crashing the whole page
+        console.error(`Error fetching rating for guide ${guideId}:`, error);
+        return { rating: 0, reviews: 0 };
+    }
+    
+    if (!data || data.length === 0) {
         return { rating: 0, reviews: 0 };
     }
 
@@ -44,6 +50,15 @@ async function getGuideRating(guideId: string) {
     const averageRating = totalRating / data.length;
     return { rating: parseFloat(averageRating.toFixed(1)), reviews: data.length };
 }
+
+// Helper to format a Date object to 'YYYY-MM-DD' string, ignoring timezone.
+const toYYYYMMDD = (date: Date) => {
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const d = date.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
 
 export default function SearchGuidesPage() {
     const [startDate, setStartDate] = React.useState<Date | undefined>();
@@ -58,24 +73,38 @@ export default function SearchGuidesPage() {
     React.useEffect(() => {
         async function fetchGuides() {
             setIsLoading(true);
-            const { data, error } = await supabase.from('guides').select('*');
-            if (data) {
-                const guidesWithRatings = await Promise.all(
-                    data.map(async (guide) => {
-                        const { rating, reviews } = await getGuideRating(guide.id);
-                        return { ...guide, rating, reviews } as Guide;
-                    })
-                );
-                
-                const allSpecialties = [...new Set(guidesWithRatings.flatMap(g => g.specialties || []))];
-                setSpecialtiesList(allSpecialties);
+            try {
+                const { data: guidesData, error: guidesError } = await supabase.from('guides').select('*');
 
-                setAllGuides(guidesWithRatings);
-                setFilteredGuides(guidesWithRatings);
-            } else {
-                console.error(error);
+                if (guidesError) {
+                    console.error("Failed to fetch guides:", guidesError);
+                    return; 
+                }
+
+                if (guidesData) {
+                    const guidesWithRatings = await Promise.all(
+                        guidesData.map(async (guide) => {
+                            try {
+                                const { rating, reviews } = await getGuideRating(guide.id);
+                                return { ...guide, rating, reviews } as Guide;
+                            } catch (ratingError) {
+                                console.error(`Failed to process rating for guide ${guide.id}:`, ratingError);
+                                return { ...guide, rating: 0, reviews: 0 } as Guide;
+                            }
+                        })
+                    );
+                    
+                    const allSpecialties = [...new Set(guidesWithRatings.flatMap(g => g.specialties || []))];
+                    setSpecialtiesList(allSpecialties);
+
+                    setAllGuides(guidesWithRatings);
+                    setFilteredGuides(guidesWithRatings);
+                }
+            } catch (error) {
+                console.error("An unexpected error occurred while fetching guides:", error);
+            } finally {
+                setIsLoading(false);
             }
-            setIsLoading(false);
         }
         fetchGuides();
     }, []);
@@ -89,12 +118,15 @@ export default function SearchGuidesPage() {
 
         if(startDate && endDate) {
             guides = guides.filter(guide => {
-                if(!guide.availability) return false;
-                const availableDates = guide.availability.map(d => new Date(d).getTime());
-                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                    if (availableDates.includes(d.getTime())) {
-                        return true; 
+                if(!guide.availability || guide.availability.length === 0) return false;
+                const availableDates = new Set(guide.availability);
+                
+                let currentDate = new Date(startDate);
+                while (currentDate <= endDate) {
+                    if (availableDates.has(toYYYYMMDD(currentDate))) {
+                        return true;
                     }
+                    currentDate.setDate(currentDate.getDate() + 1);
                 }
                 return false;
             });
