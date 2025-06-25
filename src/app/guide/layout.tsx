@@ -16,23 +16,19 @@ const navItems = [
     { href: '/guide/profile', icon: User, label: 'Mi Perfil' },
 ];
 
+const supabase = createClient();
+
 export default function GuideLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
-    const supabase = createClient();
     const [user, setUser] = React.useState<SupabaseUser | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
 
     React.useEffect(() => {
-        console.log("GuideLayout: useEffect started.");
         const { data: authListener } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                console.log("GuideLayout: Auth state changed. Event:", event);
                 try {
                     if (session) {
-                        console.log("GuideLayout: Session found for user:", session.user.email);
-                        
-                        console.log("GuideLayout: Checking for existing guide profile for ID:", session.user.id);
                         const { data: guideProfile, error: selectError } = await supabase
                             .from('guides')
                             .select('id')
@@ -44,10 +40,7 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
                             throw selectError;
                         }
 
-                        console.log("GuideLayout: Profile check result:", guideProfile);
-
                         if (!guideProfile) {
-                           console.log("GuideLayout: No profile found. Creating new guide profile...");
                            const { error: insertError } = await supabase.from('guides').insert({
                                 id: session.user.id,
                                 email: session.user.email,
@@ -59,33 +52,26 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
                                 console.error("GuideLayout: Error creating new profile:", insertError);
                                 throw insertError;
                             }
-                            console.log("GuideLayout: New profile created successfully.");
-                        } else {
-                            console.log("GuideLayout: Existing profile confirmed.");
                         }
 
                         setUser(session.user);
-                        console.log("GuideLayout: User state updated.");
 
                     } else {
-                        console.log("GuideLayout: No session found. Redirecting to /login.");
                         router.push('/login');
                     }
                 } catch (error) {
                     console.error("GuideLayout: An error occurred in onAuthStateChange logic:", error);
                     router.push('/login');
                 } finally {
-                    console.log("GuideLayout: Setting isLoading to false.");
                     setIsLoading(false);
                 }
             }
         );
 
         return () => {
-            console.log("GuideLayout: Unsubscribing from auth listener.");
             authListener.subscription.unsubscribe();
         };
-    }, [supabase, router]);
+    }, [router]);
 
     const handleSignOut = async () => {
         await supabase.auth.signOut();

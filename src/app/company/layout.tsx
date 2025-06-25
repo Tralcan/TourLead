@@ -15,23 +15,19 @@ const navItems = [
     { href: '/company/profile', icon: Building2, label: 'Perfil de la Empresa' },
 ];
 
+const supabase = createClient();
+
 export default function CompanyLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
-    const supabase = createClient();
     const [user, setUser] = React.useState<User | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
 
     React.useEffect(() => {
-        console.log("CompanyLayout: useEffect started.");
         const { data: authListener } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                console.log("CompanyLayout: Auth state changed. Event:", event);
                 try {
                     if (session) {
-                        console.log("CompanyLayout: Session found for user:", session.user.email);
-                        
-                        console.log("CompanyLayout: Checking for existing company profile for ID:", session.user.id);
                         const { data: companyProfile, error: selectError } = await supabase
                             .from('companies')
                             .select('id')
@@ -43,10 +39,7 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                             throw selectError;
                         }
 
-                        console.log("CompanyLayout: Profile check result:", companyProfile);
-
                         if (!companyProfile) {
-                           console.log("CompanyLayout: No profile found. Creating new company profile...");
                            const { error: insertError } = await supabase.from('companies').insert({
                                 id: session.user.id,
                                 email: session.user.email,
@@ -56,32 +49,25 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                                 console.error("CompanyLayout: Error creating new profile:", insertError);
                                 throw insertError;
                             }
-                            console.log("CompanyLayout: New profile created successfully.");
-                        } else {
-                             console.log("CompanyLayout: Existing profile confirmed.");
                         }
                         setUser(session.user);
-                        console.log("CompanyLayout: User state updated.");
 
                     } else {
-                        console.log("CompanyLayout: No session found. Redirecting to /login.");
                         router.push('/login');
                     }
                 } catch(error) {
                     console.error("CompanyLayout: An error occurred in onAuthStateChange logic:", error);
                     router.push('/login');
                 } finally {
-                    console.log("CompanyLayout: Setting isLoading to false.");
                     setIsLoading(false);
                 }
             }
         );
 
         return () => {
-            console.log("CompanyLayout: Unsubscribing from auth listener.");
             authListener.subscription.unsubscribe();
         };
-    }, [supabase, router]);
+    }, [router]);
     
     const handleSignOut = async () => {
         await supabase.auth.signOut();
