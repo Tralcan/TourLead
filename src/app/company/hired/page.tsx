@@ -1,6 +1,7 @@
 
 "use client"
 import React from "react";
+import Link from "next/link";
 import {
     Table,
     TableBody,
@@ -12,13 +13,13 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { format, isPast } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { RateEntity } from "@/components/star-rating";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { History } from "lucide-react";
 
 type GuideInfo = {
     id: string;
@@ -39,7 +40,6 @@ type GuideStatus = {
     job_type: string | null;
     start_date: string;
     end_date: string;
-    guide_rating?: number | null;
 }
 
 function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: GuideInfo, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
@@ -97,74 +97,60 @@ export default function HiredGuidesPage() {
     const [selectedGuide, setSelectedGuide] = React.useState<GuideInfo | null>(null);
     const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false);
 
-    const fetchGuides = React.useCallback(async () => {
-        setIsLoading(true);
-        const { data: { user } } = await supabase.auth.getUser();
-
-        if (!user) {
-            setIsLoading(false);
-            return;
-        }
-
-        try {
-            const [commitmentsRes, offersRes] = await Promise.all([
-                supabase.from('commitments').select('id, job_type, start_date, end_date, guide_rating, guide:guides(*)').eq('company_id', user.id),
-                supabase.from('offers').select('id, job_type, start_date, end_date, guide:guides(*)').eq('company_id', user.id).eq('status', 'pending')
-            ]);
-            
-            const { data: commitmentsData, error: commitmentsError } = commitmentsRes;
-            if (commitmentsError) throw new Error(`Error al cargar contrataciones: ${commitmentsError.message}`);
-            
-            const { data: offersData, error: offersError } = offersRes;
-            if (offersError) throw new Error(`Error al cargar ofertas: ${offersError.message}`);
-
-            const acceptedGuides: GuideStatus[] = (commitmentsData || []).map(item => ({
-                id: item.id.toString(),
-                status: 'Aceptado',
-                job_type: item.job_type,
-                start_date: item.start_date,
-                end_date: item.end_date,
-                guide_rating: item.guide_rating,
-                guide: item.guide as GuideInfo,
-            }));
-
-            const pendingGuides: GuideStatus[] = (offersData || []).map(item => ({
-                id: item.id.toString(),
-                status: 'Pendiente',
-                job_type: item.job_type,
-                start_date: item.start_date,
-                end_date: item.end_date,
-                guide: item.guide as GuideInfo,
-            }));
-
-            setGuidesList([...acceptedGuides, ...pendingGuides]);
-
-        } catch (error) {
-            console.error(error);
-            const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-            toast({ title: "Error", description: `No se pudieron cargar los datos: ${errorMessage}`, variant: "destructive" });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [supabase, toast]);
-
     React.useEffect(() => {
+        const fetchGuides = async () => {
+            setIsLoading(true);
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (!user) {
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                const today = new Date().toISOString();
+
+                const [commitmentsRes, offersRes] = await Promise.all([
+                    supabase.from('commitments').select('id, job_type, start_date, end_date, guide:guides(*)').eq('company_id', user.id).gte('end_date', today),
+                    supabase.from('offers').select('id, job_type, start_date, end_date, guide:guides(*)').eq('company_id', user.id).eq('status', 'pending').gte('end_date', today)
+                ]);
+                
+                const { data: commitmentsData, error: commitmentsError } = commitmentsRes;
+                if (commitmentsError) throw new Error(`Error al cargar contrataciones: ${commitmentsError.message}`);
+                
+                const { data: offersData, error: offersError } = offersRes;
+                if (offersError) throw new Error(`Error al cargar ofertas: ${offersError.message}`);
+
+                const acceptedGuides: GuideStatus[] = (commitmentsData || []).map(item => ({
+                    id: item.id.toString(),
+                    status: 'Aceptado',
+                    job_type: item.job_type,
+                    start_date: item.start_date,
+                    end_date: item.end_date,
+                    guide: item.guide as GuideInfo,
+                }));
+
+                const pendingGuides: GuideStatus[] = (offersData || []).map(item => ({
+                    id: item.id.toString(),
+                    status: 'Pendiente',
+                    job_type: item.job_type,
+                    start_date: item.start_date,
+                    end_date: item.end_date,
+                    guide: item.guide as GuideInfo,
+                }));
+
+                setGuidesList([...acceptedGuides, ...pendingGuides].sort((a,b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()));
+
+            } catch (error) {
+                console.error(error);
+                const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+                toast({ title: "Error", description: `No se pudieron cargar los datos: ${errorMessage}`, variant: "destructive" });
+            } finally {
+                setIsLoading(false);
+            }
+        };
         fetchGuides();
-    }, [fetchGuides]);
-
-    const handleRateGuide = async (commitmentId: string, rating: number) => {
-        const { error } = await supabase
-            .from('commitments')
-            .update({ guide_rating: rating })
-            .eq('id', commitmentId);
-
-        if (error) {
-            toast({ title: "Error", description: "No se pudo guardar la calificación.", variant: "destructive" });
-        } else {
-            toast({ title: "Éxito", description: "Calificación guardada correctamente." });
-            fetchGuides(); 
-        }
-    };
+    }, [supabase, toast]);
     
     const handleViewProfile = (guide: GuideInfo) => {
         setSelectedGuide(guide);
@@ -173,9 +159,17 @@ export default function HiredGuidesPage() {
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>Gestión de Guías</CardTitle>
-                <CardDescription>Revisa el estado de tus ofertas y gestiona a los guías que has contratado.</CardDescription>
+            <CardHeader className="flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Gestión de Guías</CardTitle>
+                    <CardDescription>Revisa el estado de tus ofertas y gestiona a los guías que has contratado.</CardDescription>
+                </div>
+                <Link href="/company/hired/history" passHref>
+                    <Button variant="outline">
+                        <History className="mr-2 h-4 w-4" />
+                        Ver Historial
+                    </Button>
+                </Link>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -203,7 +197,9 @@ export default function HiredGuidesPage() {
                                         </Avatar>
                                         <div>
                                             <div className="font-medium">{item.guide.name}</div>
-                                            <div className="text-sm text-muted-foreground">{item.guide.email}</div>
+                                            {item.status === 'Aceptado' && item.guide.phone && (
+                                                <div className="text-sm text-muted-foreground">{item.guide.phone}</div>
+                                            )}
                                         </div>
                                     </div>
                                 </TableCell>
@@ -215,25 +211,16 @@ export default function HiredGuidesPage() {
                                     <Badge variant={item.status === 'Aceptado' ? 'default' : 'outline'}>{item.status}</Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        {item.status === 'Aceptado' && (
-                                            <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)}>Ver Perfil</Button>
-                                        )}
-                                        {item.status === 'Aceptado' && isPast(new Date(item.end_date)) && (
-                                            <RateEntity 
-                                                entityName={item.guide.name ?? 'Guía'} 
-                                                currentRating={item.guide_rating ?? undefined}
-                                                onSave={(rating) => handleRateGuide(item.id, rating)}
-                                            />
-                                        )}
-                                    </div>
+                                    {item.status === 'Aceptado' && (
+                                        <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)}>Ver Perfil</Button>
+                                    )}
                                 </TableCell>
                             </TableRow>
                         ))}
                          {!isLoading && guidesList.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={5} className="text-center text-muted-foreground">
-                                    No tienes ofertas pendientes ni guías contratados.
+                                    No tienes ofertas pendientes ni guías contratados para fechas futuras.
                                 </TableCell>
                             </TableRow>
                          )}

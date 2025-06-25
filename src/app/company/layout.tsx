@@ -105,7 +105,7 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                                 <Link
                                     href={item.href}
                                     className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors md:h-8 md:w-8 ${
-                                        pathname === item.href
+                                        pathname.startsWith(item.href)
                                             ? 'bg-accent text-accent-foreground'
                                             : 'text-muted-foreground hover:text-foreground'
                                     }`}
@@ -127,7 +127,7 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                     </Button>
                     <div className="flex-1">
                         <h1 className="font-headline text-lg font-semibold">
-                            {navItems.find(item => item.href === pathname)?.label || 'Panel'}
+                            {navItems.find(item => pathname.startsWith(item.href))?.label || 'Panel'}
                         </h1>
                     </div>
                     <DropdownMenu>
