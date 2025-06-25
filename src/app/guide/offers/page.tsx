@@ -4,16 +4,18 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { JobOffer } from "@/lib/types";
+import { JobOffer, Company } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Check, X } from "lucide-react";
+import { Check, X, Eye } from "lucide-react";
 import { StarRatingDisplay } from "@/components/star-rating";
 import React from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { acceptOffer } from '@/app/actions/offers';
+import { Badge } from "@/components/ui/badge";
 
 const supabase = createClient();
 
@@ -34,11 +36,49 @@ async function getCompanyRating(companyId: string) {
 }
 
 
+function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Company, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+    if (!company) return null;
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader className="flex flex-row items-center gap-4">
+                     <Avatar className="h-16 w-16">
+                        <AvatarImage src={company.avatar ?? ''} alt={company.name ?? ''} />
+                        <AvatarFallback>{company.name?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <DialogTitle className="text-2xl">{company.name}</DialogTitle>
+                        <DialogDescription>
+                            {company.email}
+                        </DialogDescription>
+                    </div>
+                </DialogHeader>
+                <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                    {company.details && <p className="text-sm text-muted-foreground">{company.details}</p>}
+                    <div>
+                        <h4 className="font-semibold text-sm mb-2">Especialidades</h4>
+                        <div className="flex flex-wrap gap-2">
+                             {company.specialties?.length ? company.specialties.map(spec => <Badge key={spec} variant="secondary">{spec}</Badge>) : <p className="text-sm text-muted-foreground">No especificado</p>}
+                        </div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+                        Cerrar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 export default function OffersPage() {
     const { toast } = useToast();
     const [offers, setOffers] = React.useState<JobOffer[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [user, setUser] = React.useState<User | null>(null);
+    const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null);
+    const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false);
 
     const fetchOffers = React.useCallback(async (currentUser: User) => {
         setIsLoading(true);
@@ -82,6 +122,11 @@ export default function OffersPage() {
         getUserAndOffers();
     }, [fetchOffers]);
 
+
+    const handleViewProfile = (company: Company) => {
+        setSelectedCompany(company);
+        setIsProfileDialogOpen(true);
+    };
 
     const handleAccept = async (offer: JobOffer) => {
         const result = await acceptOffer({
@@ -141,7 +186,13 @@ export default function OffersPage() {
                                         <CardTitle className="font-headline">{offer.job_type}</CardTitle>
                                         <CardDescription>De {offer.company.name}</CardDescription>
                                     </div>
-                                    <StarRatingDisplay rating={offer.company.rating} reviews={offer.company.reviews} />
+                                     <div className="flex items-center gap-2">
+                                        <Button variant="outline" size="sm" onClick={() => handleViewProfile(offer.company)}>
+                                            <Eye className="mr-2 h-4 w-4" />
+                                            Ver Empresa
+                                        </Button>
+                                        <StarRatingDisplay rating={offer.company.rating} reviews={offer.company.reviews} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -171,6 +222,13 @@ export default function OffersPage() {
                         <p className="text-muted-foreground">Actualmente no tienes nuevas ofertas de trabajo. ¡Vuelve más tarde!</p>
                     </CardContent>
                 </Card>
+            )}
+             {selectedCompany && (
+                <CompanyProfileDialog 
+                    company={selectedCompany}
+                    isOpen={isProfileDialogOpen}
+                    onOpenChange={setIsProfileDialogOpen}
+                />
             )}
         </div>
     );

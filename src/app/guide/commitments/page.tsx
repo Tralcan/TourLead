@@ -1,6 +1,7 @@
 
 "use client"
 import React from 'react';
+import Link from "next/link";
 import {
     Table,
     TableBody,
@@ -11,8 +12,10 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { format, isPast } from "date-fns";
 import { es } from "date-fns/locale";
+import { History } from "lucide-react";
 import { RateEntity } from '@/components/star-rating';
 import { Commitment } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
@@ -33,6 +36,7 @@ export default function CommitmentsPage() {
             return;
         }
 
+        const today = new Date().toISOString().split('T')[0];
         const { data, error } = await supabase
             .from('commitments')
             .select(`
@@ -48,7 +52,9 @@ export default function CommitmentsPage() {
                     email
                 )
             `)
-            .eq('guide_id', user.id);
+            .eq('guide_id', user.id)
+            .gte('end_date', today)
+            .order('start_date', { ascending: true });
         
         if (data) {
             const transformedData = data.map(c => ({
@@ -68,7 +74,7 @@ export default function CommitmentsPage() {
         fetchCommitments();
     }, [fetchCommitments]);
 
-    const handleRateCompany = async (commitmentId: string, rating: number) => {
+    const handleRateCompany = async (commitmentId: number, rating: number) => {
         const { error } = await supabase
             .from('commitments')
             .update({ company_rating: rating })
@@ -84,9 +90,17 @@ export default function CommitmentsPage() {
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>Mis Compromisos</CardTitle>
-                <CardDescription>Una lista de todos tus trabajos programados, pasados y futuros.</CardDescription>
+            <CardHeader className="flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Mis Compromisos Próximos</CardTitle>
+                    <CardDescription>Una lista de todos tus trabajos programados y futuros.</CardDescription>
+                </div>
+                 <Link href="/guide/commitments/history" passHref>
+                    <Button variant="outline">
+                        <History className="mr-2 h-4 w-4" />
+                        Ver Historial
+                    </Button>
+                </Link>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -95,7 +109,7 @@ export default function CommitmentsPage() {
                             <TableHead>Empresa</TableHead>
                             <TableHead>Fechas</TableHead>
                             <TableHead>Trabajo</TableHead>
-                            <TableHead className="text-right">Estado/Calificación</TableHead>
+                            <TableHead className="text-right">Estado</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
