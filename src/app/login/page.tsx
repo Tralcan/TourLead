@@ -10,7 +10,8 @@ export default function LoginPage() {
 
     const handleGoogleLogin = async (userType: 'guide' | 'company') => {
         const finalRedirectPath = `/${userType}`;
-        const redirectTo = `${window.location.origin}/auth/callback?next=${finalRedirectPath}`;
+        // La ruta redirectTo debe ser relativa a la URL del sitio configurada en tu proyecto de Supabase.
+        const redirectTo = `/auth/callback?next=${finalRedirectPath}`;
 
         await supabase.auth.signInWithOAuth({
             provider: 'google',
