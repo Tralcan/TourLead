@@ -48,7 +48,6 @@ async function getGuideRating(guideId: string) {
         .not('guide_rating', 'is', null);
 
     if (error) {
-        console.error(`getGuideRating: Error al buscar calificaciones para ${guideId}:`, error);
         return { rating: 0, reviews: 0 };
     }
     
@@ -224,8 +223,8 @@ export default function SearchGuidesPage() {
 
                 setFilteredGuides([]);
             } catch (error) {
-                console.error("SearchPage: Ocurrió un error inesperado al obtener los datos:", error);
-                toast({ title: "Error", description: "Ocurrió un error inesperado al cargar los datos de búsqueda.", variant: "destructive" });
+                const errorMessage = error instanceof Error ? error.message : "Un error desconocido ocurrió.";
+                toast({ title: "Error", description: `Ocurrió un error inesperado al cargar los datos de búsqueda: ${errorMessage}`, variant: "destructive" });
             } finally {
                 setIsLoading(false);
             }
@@ -237,36 +236,61 @@ export default function SearchGuidesPage() {
         setIsSearching(true);
         setHasSearched(true);
         
+        console.log("--- Iniciando Búsqueda ---");
+        console.log("Filtros seleccionados:", { startDate, endDate, specialty, language });
+
         let guides = [...allGuides];
+        console.log(`Paso 0: Total de guías iniciales: ${guides.length}`);
 
         if (specialty) {
             guides = guides.filter(g => g.specialties?.includes(specialty));
+            console.log(`Paso 1: Guías restantes después de filtro de especialidad ('${specialty}'): ${guides.length}`);
         }
 
         if (language) {
             guides = guides.filter(g => g.languages?.includes(language));
+            console.log(`Paso 2: Guías restantes después de filtro de idioma ('${language}'): ${guides.length}`);
         }
 
         if(startDate && endDate) {
+            console.log("Paso 3: Aplicando filtro de fechas...");
             guides = guides.filter(guide => {
+                console.log(`\nVerificando guía: ${guide.name} (ID: ${guide.id})`);
                 if(!guide.availability || guide.availability.length === 0) {
+                    console.log(` -> Descartado: Sin fechas de disponibilidad.`);
                     return false;
                 }
                 
                 const availableDates = new Set(guide.availability.map(d => d.split('T')[0]));
+                console.log(" -> Fechas disponibles del guía:", Array.from(availableDates));
                 
+                let requiredDates = [];
+                let tempDate = new Date(startDate);
+                while(tempDate <= endDate) {
+                    requiredDates.push(toYYYYMMDD(tempDate));
+                    tempDate.setDate(tempDate.getDate() + 1);
+                }
+                console.log(" -> Fechas requeridas por la búsqueda:", requiredDates);
+
                 let currentDate = new Date(startDate);
                 while (currentDate <= endDate) {
                     const dateToCheck = toYYYYMMDD(currentDate);
                     if (!availableDates.has(dateToCheck)) {
+                        console.log(` -> Descartado: Falta la fecha ${dateToCheck}.`);
                         return false; 
                     }
                     currentDate.setDate(currentDate.getDate() + 1);
                 }
+                
+                console.log(` -> CONSERVADO: Cumple con todas las fechas.`);
                 return true; 
             });
+            console.log(`Paso 3 - Final: Guías restantes después del filtro de fechas: ${guides.length}`);
+        } else {
+            console.log("Paso 3: Filtro de fechas no aplicado (faltan fechas de inicio/fin).");
         }
         
+        console.log("--- Búsqueda Finalizada ---");
         setFilteredGuides(guides);
         setIsSearching(false);
     }
@@ -434,5 +458,7 @@ export default function SearchGuidesPage() {
         </div>
     );
 }
+
+    
 
     
