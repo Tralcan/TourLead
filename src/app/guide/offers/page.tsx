@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -8,6 +9,7 @@ import { mockOffers } from "@/lib/data";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Check, X } from "lucide-react";
+import { StarRatingDisplay } from "@/components/star-rating";
 
 export default function OffersPage() {
     const { toast } = useToast();
@@ -31,17 +33,24 @@ export default function OffersPage() {
         <div className="space-y-6">
             {mockOffers.map(offer => (
                 <Card key={offer.id}>
-                    <CardHeader className="flex flex-row items-start gap-4">
-                        <Avatar className="h-12 w-12">
-                            <AvatarImage src={offer.company.avatar} alt={offer.company.name} />
-                            <AvatarFallback>{offer.company.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                            <CardTitle className="font-headline">{offer.jobType}</CardTitle>
-                            <CardDescription>De {offer.company.name}</CardDescription>
+                    <CardHeader>
+                       <div className="flex flex-row items-start gap-4">
+                            <Avatar className="h-12 w-12">
+                                <AvatarImage src={offer.company.avatar} alt={offer.company.name} />
+                                <AvatarFallback>{offer.company.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <CardTitle className="font-headline">{offer.jobType}</CardTitle>
+                                        <CardDescription>De {offer.company.name}</CardDescription>
+                                    </div>
+                                    <StarRatingDisplay rating={offer.company.rating} reviews={offer.company.reviews} />
+                                </div>
+                            </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="space-y-2">
+                    <CardContent className="space-y-2 pt-0">
                         <p className="font-semibold">Fechas: <span className="font-normal">{format(offer.startDate, "d MMM, yyyy", { locale: es })} - {format(offer.endDate, "d MMM, yyyy", { locale: es })}</span></p>
                         <p className="text-muted-foreground">{offer.description}</p>
                     </CardContent>

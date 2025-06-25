@@ -1,4 +1,5 @@
-import { addDays } from "date-fns";
+
+import { addDays, subDays } from "date-fns";
 import type { Guide, Company, JobOffer, Commitment } from "./types";
 
 const today = new Date();
@@ -11,6 +12,8 @@ export const mockCompanies: Company[] = [
     avatar: "https://placehold.co/100x100.png",
     specialties: ["Senderismo", "Ciclismo de Montaña", "Kayak"],
     details: "Proveedor líder de tours de aventura al aire libre durante más de 15 años. Nos enfocamos en experiencias sostenibles y emocionantes.",
+    rating: 4.8,
+    reviews: 25,
   },
   {
     id: "comp2",
@@ -19,6 +22,8 @@ export const mockCompanies: Company[] = [
     avatar: "https://placehold.co/100x100.png",
     specialties: ["Historia", "Arquitectura", "Tours Gastronómicos"],
     details: "Explora las joyas ocultas de la ciudad con nuestros expertos guías locales. Ofrecemos una variedad de tours a pie y en autobús.",
+    rating: 4.9,
+    reviews: 42,
   },
 ];
 
@@ -31,11 +36,30 @@ export const mockGuides: Guide[] = [
     specialties: ["Historia", "Historia del Arte"],
     languages: ["Inglés", "Español"],
     rate: 250,
+    rating: 4.9,
+    reviews: 15,
     availability: [addDays(today, 5), addDays(today, 6), addDays(today, 10), addDays(today, 11), addDays(today, 12)],
     commitments: [
+       {
+        id: "commit_past_1",
+        company: mockCompanies[1],
+        jobType: "Recorrido por Museo de Arte",
+        startDate: subDays(today, 20),
+        endDate: subDays(today, 18),
+        guideRating: 5,
+        companyRating: 5,
+      },
+      {
+        id: "commit_past_2",
+        company: mockCompanies[0],
+        jobType: "Ruta de Senderismo Histórica",
+        startDate: subDays(today, 10),
+        endDate: subDays(today, 8),
+        guideRating: 4, 
+      },
       {
         id: "commit1",
-        company: { id: "comp2", name: "Tours CityScape", email: "reservas@tourscityscape.com" },
+        company: mockCompanies[1],
         jobType: "Recorrido Histórico a Pie",
         startDate: addDays(today, 1),
         endDate: addDays(today, 3),
@@ -50,6 +74,8 @@ export const mockGuides: Guide[] = [
     specialties: ["Senderismo", "Vida Silvestre"],
     languages: ["Inglés", "Francés"],
     rate: 300,
+    rating: 4.5,
+    reviews: 12,
     availability: [addDays(today, 7), addDays(today, 8), addDays(today, 9), addDays(today, 14)],
     commitments: [],
   },
@@ -61,15 +87,25 @@ export const mockGuides: Guide[] = [
     specialties: ["Tours Gastronómicos", "Vida Nocturna"],
     languages: ["Inglés", "Italiano"],
     rate: 220,
+    rating: 4.7,
+    reviews: 21,
     availability: [addDays(today, 2), addDays(today, 3), addDays(today, 4)],
     commitments: [
       {
         id: "commit2",
-        company: { id: "comp2", name: "Tours CityScape", email: "reservas@tourscityscape.com" },
+        company: mockCompanies[1],
         jobType: "Gastronomía y Vinos del Centro",
         startDate: addDays(today, 20),
         endDate: addDays(today, 20),
       },
+       {
+        id: "commit_past_3",
+        company: mockCompanies[0],
+        jobType: "Aventura en Kayak",
+        startDate: subDays(today, 5),
+        endDate: subDays(today, 5),
+        companyRating: 5, 
+      }
     ],
   },
   {
@@ -80,6 +116,8 @@ export const mockGuides: Guide[] = [
     specialties: ["Arquitectura", "Arte Moderno"],
     languages: ["Inglés", "Alemán"],
     rate: 275,
+    rating: 5.0,
+    reviews: 8,
     availability: [addDays(today, 1), addDays(today, 2), addDays(today, 8), addDays(today, 9), addDays(today, 10)],
     commitments: [],
   },

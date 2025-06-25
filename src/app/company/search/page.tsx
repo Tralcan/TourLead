@@ -1,9 +1,10 @@
+
 "use client";
 
 import React from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, DollarSign, Star, User } from "lucide-react";
+import { Calendar as CalendarIcon, DollarSign, User } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -23,6 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { mockGuides } from "@/lib/data";
+import { StarRatingDisplay } from "@/components/star-rating";
 
 export default function SearchGuidesPage() {
     const [startDate, setStartDate] = React.useState<Date | undefined>();
@@ -115,10 +117,7 @@ export default function SearchGuidesPage() {
                                     <DollarSign className="h-4 w-4 text-primary" />
                                     <span>{guide.rate} / día</span>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <Star className="h-4 w-4 text-primary" />
-                                    <span>5.0 (12 reseñas)</span>
-                                </div>
+                                <StarRatingDisplay rating={guide.rating} reviews={guide.reviews} />
                             </div>
                         </CardContent>
                         <CardFooter>
