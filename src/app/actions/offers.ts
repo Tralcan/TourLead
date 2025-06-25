@@ -2,7 +2,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { sendOfferEmail } from '@/services/email';
+import { sendOfferEmail, sendAcceptanceNotificationEmail } from '@/services/email';
 import { z } from 'zod';
 
 const offerSchema = z.object({
@@ -84,4 +84,78 @@ export async function createOffer(formData: FormData) {
     }
 
     return { success: true, message: '¡Oferta enviada exitosamente!' };
+}
+
+const acceptOfferSchema = z.object({
+    offerId: z.number(),
+    guideId: z.string().uuid(),
+    companyId: z.string().uuid(),
+    jobType: z.string().nullable(),
+    startDate: z.string(),
+    endDate: z.string(),
+});
+
+export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
+    const supabase = createClient();
+    
+    // 1. Update offer status
+    const { error: updateError } = await supabase
+        .from('offers')
+        .update({ status: 'accepted' })
+        .eq('id', data.offerId);
+
+    if (updateError) {
+        console.error("Error al aceptar la oferta:", updateError);
+        return { success: false, message: "No se pudo aceptar la oferta." };
+    }
+
+    // 2. Create commitment
+    const { error: insertError } = await supabase
+        .from('commitments')
+        .insert({
+            guide_id: data.guideId,
+            company_id: data.companyId,
+            job_type: data.jobType,
+            start_date: data.startDate,
+            end_date: data.endDate,
+        });
+    
+    if (insertError) {
+        console.error("Error al crear compromiso:", insertError);
+        return { success: false, message: "No se pudo crear el compromiso." };
+    }
+
+    // 3. Send notification email
+    const { data: companyData, error: companyError } = await supabase
+        .from('companies')
+        .select('name, email')
+        .eq('id', data.companyId)
+        .single();
+    
+    const { data: guideData, error: guideError } = await supabase
+        .from('guides')
+        .select('name')
+        .eq('id', data.guideId)
+        .single();
+
+    if (companyError || guideError || !companyData || !guideData || !companyData.email) {
+        console.error("Fallo al obtener datos para el email de aceptación:", { companyError, guideError });
+        return { success: true, message: 'Oferta aceptada, pero no se pudo enviar la notificación por correo a la empresa.' };
+    }
+
+    try {
+        await sendAcceptanceNotificationEmail({
+            to: companyData.email,
+            companyName: companyData.name || 'Una empresa',
+            guideName: guideData.name || 'un guía',
+            jobType: data.jobType || 'No especificado',
+            startDate: new Date(data.startDate.replace(/-/g, '/')),
+            endDate: new Date(data.endDate.replace(/-/g, '/')),
+        });
+    } catch (emailError) {
+        console.error("Error al enviar el email de aceptación:", emailError);
+        return { success: true, message: 'Oferta aceptada, pero falló el envío de la notificación por correo a la empresa.' };
+    }
+
+    return { success: true, message: '¡Oferta Aceptada!' };
 }

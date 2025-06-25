@@ -13,6 +13,7 @@ import { StarRatingDisplay } from "@/components/star-rating";
 import React from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
+import { acceptOffer } from '@/app/actions/offers';
 
 const supabase = createClient();
 
@@ -83,34 +84,23 @@ export default function OffersPage() {
 
 
     const handleAccept = async (offer: JobOffer) => {
-        const { error: updateError } = await supabase
-            .from('offers')
-            .update({ status: 'accepted' })
-            .eq('id', offer.id);
+        const result = await acceptOffer({
+            offerId: offer.id,
+            guideId: offer.guide_id,
+            companyId: offer.company.id,
+            jobType: offer.job_type,
+            startDate: format(offer.startDate, 'yyyy-MM-dd'),
+            endDate: format(offer.endDate, 'yyyy-MM-dd'),
+        });
 
-        if (updateError) {
-            toast({ title: "Error", description: "No se pudo aceptar la oferta.", variant: "destructive" });
-            return;
-        }
-
-        const { error: insertError } = await supabase
-            .from('commitments')
-            .insert({
-                guide_id: offer.guide_id,
-                company_id: offer.company.id,
-                job_type: offer.job_type,
-                start_date: format(offer.startDate, 'yyyy-MM-dd'),
-                end_date: format(offer.endDate, 'yyyy-MM-dd'),
-            });
-        
-        if (insertError) {
-             toast({ title: "Error", description: "No se pudo crear el compromiso.", variant: "destructive" });
-        } else {
+        if (result.success) {
             toast({
                 title: "¡Oferta Aceptada!",
                 description: `Ahora estás reservado con ${offer.company.name}. Tu calendario ha sido actualizado.`,
             });
-            if(user) fetchOffers(user); 
+            if(user) fetchOffers(user);
+        } else {
+            toast({ title: "Error", description: result.message, variant: "destructive" });
         }
     }
 
