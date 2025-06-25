@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { addDays, isBefore, startOfToday } from "date-fns"
+import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,16 +19,16 @@ export default function AvailabilityPage() {
 
   const handleSave = () => {
     toast({
-        title: "Availability Saved",
-        description: "Your calendar has been updated successfully.",
+        title: "Disponibilidad Guardada",
+        description: "Tu calendario ha sido actualizado correctamente.",
     })
   }
 
   return (
     <Card>
         <CardHeader>
-            <CardTitle>Manage Your Availability</CardTitle>
-            <CardDescription>Select the dates you are available to work. Booked dates are shown in gray.</CardDescription>
+            <CardTitle>Gestiona tu Disponibilidad</CardTitle>
+            <CardDescription>Selecciona las fechas en las que estás disponible para trabajar. Las fechas reservadas se muestran en gris.</CardDescription>
         </CardHeader>
       <CardContent className="flex justify-center">
         <Calendar
@@ -36,6 +37,7 @@ export default function AvailabilityPage() {
           onSelect={setDays}
           className="rounded-md border"
           numberOfMonths={2}
+          locale={es}
           disabled={(date) => isBefore(date, today) || bookedDays.some(bookedDate => new Date(date).toDateString() === new Date(bookedDate).toDateString())}
           modifiers={{
             booked: bookedDays,
@@ -51,19 +53,19 @@ export default function AvailabilityPage() {
         />
       </CardContent>
       <CardFooter className="flex justify-between items-center">
-        <Button onClick={handleSave} className="bg-accent text-accent-foreground hover:bg-accent/90">Save Availability</Button>
+        <Button onClick={handleSave} className="bg-accent text-accent-foreground hover:bg-accent/90">Guardar Disponibilidad</Button>
         <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
                 <div className="h-4 w-4 rounded-full bg-primary" />
-                <span>Available</span>
+                <span>Disponible</span>
             </div>
             <div className="flex items-center gap-2">
                 <div className="h-4 w-4 rounded-full bg-muted" />
-                <span>Booked</span>
+                <span>Reservado</span>
             </div>
              <div className="flex items-center gap-2">
                 <div className="h-4 w-4 rounded-full border bg-background" />
-                <span>Not Available</span>
+                <span>No Disponible</span>
             </div>
         </div>
       </CardFooter>

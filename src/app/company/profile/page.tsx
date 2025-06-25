@@ -20,20 +20,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast"
 
 const profileFormSchema = z.object({
-  name: z.string().min(2, "Company name must be at least 2 characters."),
-  email: z.string().email("Please enter a valid email address."),
-  specialties: z.string().min(1, "Please list at least one specialty."),
-  details: z.string().max(500, "Details cannot exceed 500 characters.").min(10, "Please provide more details."),
+  name: z.string().min(2, "El nombre de la empresa debe tener al menos 2 caracteres."),
+  email: z.string().email("Por favor, introduce una dirección de correo electrónico válida."),
+  specialties: z.string().min(1, "Por favor, enumera al menos una especialidad."),
+  details: z.string().max(500, "Los detalles no pueden exceder los 500 caracteres.").min(10, "Por favor, proporciona más detalles."),
 })
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
 // This can be fetched from an API
 const defaultValues: Partial<ProfileFormValues> = {
-  name: "Adventure Seekers Inc.",
-  email: "contact@adventureseekers.com",
-  specialties: "Hiking, Mountain Biking, Kayaking",
-  details: "Leading provider of outdoor adventure tours for over 15 years. We focus on sustainable and thrilling experiences.",
+  name: "Buscadores de Aventuras S.A.",
+  email: "contacto@buscadoresdeaventuras.com",
+  specialties: "Senderismo, Ciclismo de Montaña, Kayak",
+  details: "Proveedor líder de tours de aventura al aire libre durante más de 15 años. Nos enfocamos en experiencias sostenibles y emocionantes.",
 }
 
 export default function CompanyProfilePage() {
@@ -46,16 +46,16 @@ export default function CompanyProfilePage() {
 
   function onSubmit(data: ProfileFormValues) {
     toast({
-      title: "Profile Updated",
-      description: "Your company profile has been saved successfully.",
+      title: "Perfil Actualizado",
+      description: "El perfil de tu empresa se ha guardado correctamente.",
     })
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Company Profile</CardTitle>
-        <CardDescription>Manage your company's information. This is how you'll appear to guides.</CardDescription>
+        <CardTitle>Perfil de la Empresa</CardTitle>
+        <CardDescription>Administra la información de tu empresa. Así es como aparecerás ante los guías.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -65,9 +65,9 @@ export default function CompanyProfilePage() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Company Name</FormLabel>
+                  <FormLabel>Nombre de la Empresa</FormLabel>
                   <FormControl>
-                    <Input placeholder="Your Company LLC" {...field} />
+                    <Input placeholder="Tu Empresa S.L." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -78,9 +78,9 @@ export default function CompanyProfilePage() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contact Email</FormLabel>
+                  <FormLabel>Email de Contacto</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="contact@yourcompany.com" {...field} />
+                    <Input type="email" placeholder="contacto@tuempresa.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -91,12 +91,12 @@ export default function CompanyProfilePage() {
               name="specialties"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Specialties</FormLabel>
+                  <FormLabel>Especialidades</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., History, Food Tours, Hiking" {...field} />
+                    <Input placeholder="ej., Historia, Tours Gastronómicos, Senderismo" {...field} />
                   </FormControl>
                   <FormDescription>
-                    Enter your company's specialties, separated by commas.
+                    Ingresa las especialidades de tu empresa, separadas por comas.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -107,10 +107,10 @@ export default function CompanyProfilePage() {
               name="details"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Company Details</FormLabel>
+                  <FormLabel>Detalles de la Empresa</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Tell us a little bit about your company"
+                      placeholder="Cuéntanos un poco sobre tu empresa"
                       className="resize-none"
                       {...field}
                     />
@@ -119,7 +119,7 @@ export default function CompanyProfilePage() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">Update Profile</Button>
+            <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">Actualizar Perfil</Button>
           </form>
         </Form>
       </CardContent>

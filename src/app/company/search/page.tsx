@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, DollarSign, Star, User } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -33,8 +34,8 @@ export default function SearchGuidesPage() {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Find Your Perfect Guide</CardTitle>
-                    <CardDescription>Filter guides by availability and specialty to match your needs.</CardDescription>
+                    <CardTitle>Encuentra a tu Guía Perfecto</CardTitle>
+                    <CardDescription>Filtra guías por disponibilidad y especialidad para encontrar lo que necesitas.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -48,11 +49,11 @@ export default function SearchGuidesPage() {
                                     )}
                                 >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {startDate ? format(startDate, "PPP") : <span>Pick a start date</span>}
+                                    {startDate ? format(startDate, "PPP", { locale: es }) : <span>Elige una fecha de inicio</span>}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus />
+                                <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus locale={es} />
                             </PopoverContent>
                         </Popover>
 
@@ -66,17 +67,17 @@ export default function SearchGuidesPage() {
                                     )}
                                 >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {endDate ? format(endDate, "PPP") : <span>Pick an end date</span>}
+                                    {endDate ? format(endDate, "PPP", { locale: es }) : <span>Elige una fecha de fin</span>}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus />
+                                <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus locale={es} />
                             </PopoverContent>
                         </Popover>
                         
                         <Select>
                             <SelectTrigger>
-                                <SelectValue placeholder="Select a specialty" />
+                                <SelectValue placeholder="Selecciona una especialidad" />
                             </SelectTrigger>
                             <SelectContent>
                                 {specialties.map(spec => <SelectItem key={spec} value={spec}>{spec}</SelectItem>)}
@@ -86,7 +87,7 @@ export default function SearchGuidesPage() {
                     </div>
                 </CardContent>
                 <CardFooter>
-                    <Button className="bg-accent text-accent-foreground hover:bg-accent/90">Search Guides</Button>
+                    <Button className="bg-accent text-accent-foreground hover:bg-accent/90">Buscar Guías</Button>
                 </CardFooter>
             </Card>
 
@@ -112,18 +113,18 @@ export default function SearchGuidesPage() {
                             <div className="flex justify-between text-sm text-muted-foreground">
                                 <div className="flex items-center gap-1">
                                     <DollarSign className="h-4 w-4 text-primary" />
-                                    <span>{guide.rate} / day</span>
+                                    <span>{guide.rate} / día</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <Star className="h-4 w-4 text-primary" />
-                                    <span>5.0 (12 reviews)</span>
+                                    <span>5.0 (12 reseñas)</span>
                                 </div>
                             </div>
                         </CardContent>
                         <CardFooter>
                             <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
                                 <User className="mr-2 h-4 w-4" />
-                                View Profile & Offer
+                                Ver Perfil y Ofertar
                             </Button>
                         </CardFooter>
                     </Card>

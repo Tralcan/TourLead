@@ -9,9 +9,9 @@ import { Logo } from '@/components/logo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const navItems = [
-    { href: '/company/hired', icon: Users, label: 'Hired Guides' },
-    { href: '/company/search', icon: Search, label: 'Search Guides' },
-    { href: '/company/profile', icon: Building2, label: 'Company Profile' },
+    { href: '/company/hired', icon: Users, label: 'Guías Contratados' },
+    { href: '/company/search', icon: Search, label: 'Buscar Guías' },
+    { href: '/company/profile', icon: Building2, label: 'Perfil de la Empresa' },
 ];
 
 export default function CompanyLayout({ children }: { children: React.ReactNode }) {
@@ -47,11 +47,11 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                 <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
                     <Button size="icon" variant="outline" className="sm:hidden">
                         <PanelLeft className="h-5 w-5" />
-                        <span className="sr-only">Toggle Menu</span>
+                        <span className="sr-only">Alternar Menú</span>
                     </Button>
                     <div className="flex-1">
                         <h1 className="font-headline text-lg font-semibold">
-                            {navItems.find(item => item.href === pathname)?.label || 'Dashboard'}
+                            {navItems.find(item => item.href === pathname)?.label || 'Panel'}
                         </h1>
                     </div>
                     <DropdownMenu>
@@ -61,12 +61,12 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                            <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>Settings</DropdownMenuItem>
-                            <DropdownMenuItem>Support</DropdownMenuItem>
+                            <DropdownMenuItem>Configuración</DropdownMenuItem>
+                            <DropdownMenuItem>Soporte</DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>Logout</DropdownMenuItem>
+                            <DropdownMenuItem>Cerrar Sesión</DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </header>

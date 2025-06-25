@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { mockGuides } from "@/lib/data";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 const guide = mockGuides[0]; // Assuming logged in as Alice Johnson
 
@@ -17,17 +18,17 @@ export default function CommitmentsPage() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>My Commitments</CardTitle>
-                <CardDescription>A list of all your scheduled and confirmed jobs.</CardDescription>
+                <CardTitle>Mis Compromisos</CardTitle>
+                <CardDescription>Una lista de todos tus trabajos programados y confirmados.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Company</TableHead>
-                            <TableHead>Contact</TableHead>
-                            <TableHead>Dates</TableHead>
-                            <TableHead>Job Details</TableHead>
+                            <TableHead>Empresa</TableHead>
+                            <TableHead>Contacto</TableHead>
+                            <TableHead>Fechas</TableHead>
+                            <TableHead>Detalles del Trabajo</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -36,7 +37,7 @@ export default function CommitmentsPage() {
                                 <TableCell className="font-medium">{commitment.company.name}</TableCell>
                                 <TableCell>{commitment.company.email}</TableCell>
                                 <TableCell>
-                                    {format(commitment.startDate, "MMM d, yyyy")} - {format(commitment.endDate, "MMM d, yyyy")}
+                                    {format(commitment.startDate, "d MMM, yyyy", { locale: es })} - {format(commitment.endDate, "d MMM, yyyy", { locale: es })}
                                 </TableCell>
                                 <TableCell>
                                     <Badge variant="default" className="bg-primary/20 text-primary-foreground hover:bg-primary/30">{commitment.jobType}</Badge>
@@ -46,7 +47,7 @@ export default function CommitmentsPage() {
                          {guide.commitments.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={4} className="text-center text-muted-foreground">
-                                    You have no upcoming commitments.
+                                    No tienes compromisos próximos.
                                 </TableCell>
                             </TableRow>
                          )}

@@ -20,21 +20,21 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/hooks/use-toast"
 
 const profileFormSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters."),
+  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
   email: z.string().email(),
-  specialties: z.string().min(1, "Please list at least one specialty."),
-  languages: z.string().min(1, "Please list at least one language."),
-  rate: z.coerce.number().min(1, "Rate must be a positive number."),
+  specialties: z.string().min(1, "Por favor, enumera al menos una especialidad."),
+  languages: z.string().min(1, "Por favor, enumera al menos un idioma."),
+  rate: z.coerce.number().min(1, "La tarifa debe ser un número positivo."),
   avatar: z.string().optional(),
 })
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
 const defaultValues: Partial<ProfileFormValues> = {
-  name: "Alice Johnson",
-  email: "alice.j@email.com",
-  specialties: "History, Art History",
-  languages: "English, Spanish",
+  name: "Alicia Rodríguez",
+  email: "alicia.r@email.com",
+  specialties: "Historia, Historia del Arte",
+  languages: "Inglés, Español",
   rate: 250,
   avatar: "https://placehold.co/100x100.png"
 }
@@ -49,16 +49,16 @@ export default function GuideProfilePage() {
 
   function onSubmit(data: ProfileFormValues) {
     toast({
-        title: "Profile Updated",
-        description: "Your guide profile has been saved successfully.",
+        title: "Perfil Actualizado",
+        description: "Tu perfil de guía se ha guardado correctamente.",
     })
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Guide Profile</CardTitle>
-        <CardDescription>This is how your profile will appear to tour companies.</CardDescription>
+        <CardTitle>Perfil de Guía</CardTitle>
+        <CardDescription>Así es como tu perfil aparecerá a las empresas de tours.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -73,11 +73,11 @@ export default function GuideProfilePage() {
                 name="avatar"
                 render={({ field }) => (
                     <FormItem className="flex-1">
-                    <FormLabel>Profile Picture</FormLabel>
+                    <FormLabel>Foto de Perfil</FormLabel>
                     <FormControl>
                         <Input type="file" {...field} />
                     </FormControl>
-                    <FormDescription>Upload a professional headshot.</FormDescription>
+                    <FormDescription>Sube una foto profesional.</FormDescription>
                     <FormMessage />
                     </FormItem>
                 )}
@@ -90,9 +90,9 @@ export default function GuideProfilePage() {
                 name="name"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Full Name</FormLabel>
+                    <FormLabel>Nombre Completo</FormLabel>
                     <FormControl>
-                        <Input placeholder="John Doe" {...field} />
+                        <Input placeholder="Juan Pérez" {...field} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -103,9 +103,9 @@ export default function GuideProfilePage() {
                 name="email"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Correo Electrónico</FormLabel>
                     <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} />
+                        <Input type="email" placeholder="tu@ejemplo.com" {...field} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -116,11 +116,11 @@ export default function GuideProfilePage() {
                 name="specialties"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Specialties</FormLabel>
+                    <FormLabel>Especialidades</FormLabel>
                     <FormControl>
-                        <Input placeholder="e.g., Hiking, History, Art" {...field} />
+                        <Input placeholder="ej., Senderismo, Historia, Arte" {...field} />
                     </FormControl>
-                    <FormDescription>Separate specialties with a comma.</FormDescription>
+                    <FormDescription>Separa las especialidades con una coma.</FormDescription>
                     <FormMessage />
                     </FormItem>
                 )}
@@ -130,11 +130,11 @@ export default function GuideProfilePage() {
                 name="languages"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Languages Spoken</FormLabel>
+                    <FormLabel>Idiomas Hablados</FormLabel>
                     <FormControl>
-                        <Input placeholder="e.g., English, Spanish" {...field} />
+                        <Input placeholder="ej., Inglés, Español" {...field} />
                     </FormControl>
-                    <FormDescription>Separate languages with a comma.</FormDescription>
+                    <FormDescription>Separa los idiomas con una coma.</FormDescription>
                     <FormMessage />
                     </FormItem>
                 )}
@@ -144,7 +144,7 @@ export default function GuideProfilePage() {
                 name="rate"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Rate (per day)</FormLabel>
+                    <FormLabel>Tarifa (por día)</FormLabel>
                     <FormControl>
                         <div className="relative">
                             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">$</span>
@@ -157,7 +157,7 @@ export default function GuideProfilePage() {
                 />
             </div>
             
-            <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">Update Profile</Button>
+            <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">Actualizar Perfil</Button>
           </form>
         </Form>
       </CardContent>

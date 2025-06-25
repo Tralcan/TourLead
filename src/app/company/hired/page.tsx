@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { mockGuides } from "@/lib/data";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 // This would be filtered based on the logged-in company's hires
 const hiredGuides = mockGuides.filter(g => g.commitments.length > 0);
@@ -19,18 +20,18 @@ export default function HiredGuidesPage() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Your Hired Guides</CardTitle>
-                <CardDescription>A list of all tour guides currently contracted by your company.</CardDescription>
+                <CardTitle>Tus Guías Contratados</CardTitle>
+                <CardDescription>Una lista de todos los guías turísticos actualmente contratados por tu empresa.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Guide</TableHead>
-                            <TableHead>Contact</TableHead>
-                            <TableHead>Booked Dates</TableHead>
-                            <TableHead>Job Details</TableHead>
-                            <TableHead>Specialties</TableHead>
+                            <TableHead>Guía</TableHead>
+                            <TableHead>Contacto</TableHead>
+                            <TableHead>Fechas Reservadas</TableHead>
+                            <TableHead>Detalles del Trabajo</TableHead>
+                            <TableHead>Especialidades</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -48,7 +49,7 @@ export default function HiredGuidesPage() {
                                     </TableCell>
                                     <TableCell>{guide.email}</TableCell>
                                     <TableCell>
-                                        {format(commitment.startDate, "MMM d, yyyy")} - {format(commitment.endDate, "MMM d, yyyy")}
+                                        {format(commitment.startDate, "d MMM, yyyy", { locale: es })} - {format(commitment.endDate, "d MMM, yyyy", { locale: es })}
                                     </TableCell>
                                     <TableCell>{commitment.jobType}</TableCell>
                                     <TableCell>
