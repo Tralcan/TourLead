@@ -9,11 +9,11 @@ export default function LoginPage() {
     const supabase = createClient()
 
     const handleGoogleLogin = async (userType: 'guide' | 'company') => {
-        const redirectTo = `${window.location.origin}/${userType}`
+        const redirectToPath = `/${userType}`
         await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: redirectTo,
+                redirectTo: redirectToPath,
                 queryParams: {
                     access_type: 'offline',
                     prompt: 'consent',
