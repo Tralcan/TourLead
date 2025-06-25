@@ -11,12 +11,19 @@ export default function LoginPage() {
     const handleGoogleLogin = async (userType: 'guide' | 'company') => {
         const redirectTo = `${window.location.origin}/auth/callback`;
 
-        await supabase.auth.signInWithOAuth({
+        // DEBUGGING: Mostrar la URL exacta que se está utilizando.
+        alert(`URL de redirección que se enviará a Supabase:\n\n${redirectTo}\n\nAsegúrate de que esta URL sea EXACTAMENTE igual a una de las URLs en la lista de "Redirect URLs" en la configuración de autenticación de tu proyecto de Supabase.`);
+
+        const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
                 redirectTo: redirectTo,
             },
         })
+
+        if (error) {
+            alert(`Error de Supabase al intentar iniciar sesión: ${error.message}`);
+        }
     }
 
     return (
