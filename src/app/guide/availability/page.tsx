@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { isBefore, startOfToday, eachDayOfInterval, formatISO } from "date-fns"
+import { isBefore, startOfToday, eachDayOfInterval } from "date-fns"
 import { es } from "date-fns/locale";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,23 @@ import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client";
+
+// Helper to parse YYYY-MM-DD string as a local Date object, avoiding timezone shifts.
+const parseDateStringAsLocal = (dateString: string): Date => {
+    const parts = dateString.split(/[-T]/); // Split by hyphen or 'T'
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed in JS
+    const day = parseInt(parts[2], 10);
+    return new Date(year, month, day);
+};
+
+// Helper to format a local Date object into a YYYY-MM-DD string.
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export default function AvailabilityPage() {
   const today = startOfToday();
@@ -37,7 +54,7 @@ export default function AvailabilityPage() {
             .single();
 
         if (guideData?.availability) {
-            setDays(guideData.availability.map((d:string) => new Date(d)));
+            setDays(guideData.availability.map((d:string) => parseDateStringAsLocal(d)));
         }
         if(guideError) console.error("Error fetching availability:", guideError);
 
@@ -49,7 +66,7 @@ export default function AvailabilityPage() {
         
         if (commitmentsData) {
             const allBookedDays = commitmentsData.flatMap(c => 
-                eachDayOfInterval({ start: new Date(c.start_date!), end: new Date(c.end_date!) })
+                eachDayOfInterval({ start: parseDateStringAsLocal(c.start_date!), end: parseDateStringAsLocal(c.end_date!) })
             );
             setBookedDays(allBookedDays);
         }
@@ -66,11 +83,11 @@ export default function AvailabilityPage() {
         return;
     }
 
-    const isoDates = days?.map(day => formatISO(day, { representation: 'date' }));
+    const stringDates = days?.map(day => formatLocalDate(day));
     
     const { error } = await supabase
       .from('guides')
-      .update({ availability: isoDates })
+      .update({ availability: stringDates })
       .eq('id', user.id);
 
     if (error) {

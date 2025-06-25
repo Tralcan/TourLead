@@ -61,11 +61,11 @@ async function getGuideRating(guideId: string) {
     return result;
 }
 
-const toYYYYMMDD = (date: Date) => {
-    // Use local date parts to construct a UTC date. This avoids timezone-related "off-by-one" errors
-    // that can happen when a date is near midnight.
-    const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    return utcDate.toISOString().split('T')[0];
+const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
 
 const offerFormSchema = z.object({
@@ -99,8 +99,8 @@ function OfferDialog({
         
         const formData = new FormData();
         formData.append('guideId', guide.id);
-        formData.append('startDate', toYYYYMMDD(startDate));
-        formData.append('endDate', toYYYYMMDD(endDate));
+        formData.append('startDate', formatLocalDate(startDate));
+        formData.append('endDate', formatLocalDate(endDate));
         formData.append('jobType', values.job_type);
         formData.append('description', values.description);
 
@@ -235,15 +235,20 @@ export default function SearchGuidesPage() {
     const handleSearch = () => {
         setIsSearching(true);
         setHasSearched(true);
+        console.log("--- Iniciando Búsqueda ---");
+        console.log("Filtros:", { specialty, language, startDate: startDate ? formatLocalDate(startDate) : 'N/A', endDate: endDate ? formatLocalDate(endDate) : 'N/A' });
         
         let guides = [...allGuides];
+        console.log(`Paso 0: ${guides.length} guías totales.`);
 
         if (specialty) {
             guides = guides.filter(g => g.specialties?.includes(specialty));
+            console.log(`Paso 1 (Especialidad: ${specialty}): ${guides.length} guías restantes.`);
         }
 
         if (language) {
             guides = guides.filter(g => g.languages?.includes(language));
+            console.log(`Paso 2 (Idioma: ${language}): ${guides.length} guías restantes.`);
         }
 
         if(startDate && endDate) {
@@ -255,9 +260,15 @@ export default function SearchGuidesPage() {
                 const availableDates = new Set(guide.availability.map(d => d.split('T')[0]));
                 
                 let currentDate = new Date(startDate);
-                while (currentDate <= endDate) {
-                    const dateToCheck = toYYYYMMDD(currentDate);
+                currentDate.setHours(0, 0, 0, 0);
+
+                let lastDate = new Date(endDate);
+                lastDate.setHours(0, 0, 0, 0);
+
+                while (currentDate <= lastDate) {
+                    const dateToCheck = formatLocalDate(currentDate);
                     if (!availableDates.has(dateToCheck)) {
+                        console.log(`[Depuración] Guía ${guide.name} descartado. La fecha requerida ${dateToCheck} no está en su disponibilidad:`, Array.from(availableDates));
                         return false; 
                     }
                     currentDate.setDate(currentDate.getDate() + 1);
@@ -265,8 +276,10 @@ export default function SearchGuidesPage() {
                 
                 return true; 
             });
+            console.log(`Paso 3 (Fechas): ${guides.length} guías restantes.`);
         }
         
+        console.log("--- Búsqueda Finalizada ---");
         setFilteredGuides(guides);
         setIsSearching(false);
     }
@@ -434,7 +447,3 @@ export default function SearchGuidesPage() {
         </div>
     );
 }
-
-    
-
-    
