@@ -73,6 +73,7 @@ type RatingDetail = {
     id: number;
     job_type: string | null;
     guide_rating: number | null;
+    end_date: string;
     company: { name: string | null } | null;
 };
 
@@ -92,12 +93,14 @@ function RatingDetailsDialog({ guide, isOpen, onOpenChange }: { guide: Guide, is
                     id,
                     job_type,
                     guide_rating,
+                    end_date,
                     company:companies (
                         name
                     )
                 `)
                 .eq('guide_id', guide.id)
-                .not('guide_rating', 'is', null);
+                .not('guide_rating', 'is', null)
+                .order('end_date', { ascending: false });
             
             if (error) {
                 console.error("Error al obtener detalles de calificación:", error);
@@ -129,6 +132,7 @@ function RatingDetailsDialog({ guide, isOpen, onOpenChange }: { guide: Guide, is
                                 <TableRow>
                                     <TableHead>Trabajo</TableHead>
                                     <TableHead>Empresa</TableHead>
+                                    <TableHead>Fecha</TableHead>
                                     <TableHead className="text-right">Calificación</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -137,6 +141,9 @@ function RatingDetailsDialog({ guide, isOpen, onOpenChange }: { guide: Guide, is
                                     <TableRow key={rating.id}>
                                         <TableCell>{rating.job_type || 'N/A'}</TableCell>
                                         <TableCell>{rating.company?.name || 'N/A'}</TableCell>
+                                        <TableCell>
+                                            {format(new Date(rating.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
+                                        </TableCell>
                                         <TableCell className="text-right">
                                             <StarRatingDisplay rating={rating.guide_rating ?? 0} />
                                         </TableCell>
