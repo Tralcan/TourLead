@@ -2,12 +2,13 @@
 "use client";
 
 import React from "react";
-import { format } from "date-fns";
+import { format, isPast } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, DollarSign, User, Loader2 } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
+import { useRouter } from "next/navigation";
 
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -63,10 +64,10 @@ async function getGuideRating(guideId: string) {
 }
 
 const formatLocalDate = (date: Date): string => {
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const d = new Date(date.valueOf() + date.getTimezoneOffset() * 60 * 1000);
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 };
 
@@ -174,6 +175,7 @@ function OfferDialog({
     onOpenChange: (open: boolean) => void 
 }) {
     const { toast } = useToast();
+    const router = useRouter();
     const form = useForm<OfferFormValues>({
         resolver: zodResolver(offerFormSchema),
         defaultValues: { job_type: "", description: "" }
@@ -194,8 +196,7 @@ function OfferDialog({
         
         if (result.success) {
             toast({ title: "¡Oferta Enviada!", description: `Tu oferta ha sido enviada a ${guide.name}.` });
-            onOpenChange(false);
-            form.reset();
+            router.push('/company/hired');
         } else {
             toast({ title: "Error", description: result.message, variant: "destructive" });
         }
@@ -478,7 +479,7 @@ export default function SearchGuidesPage() {
                                         ))}
                                     </div>
                                     <div className="space-y-2 text-sm text-muted-foreground pt-2">
-                                        {guide.summary && <p>{guide.summary}</p>}
+                                        {guide.summary && <p className="line-clamp-3">{guide.summary}</p>}
                                     </div>
                                     <div className="flex justify-between text-sm text-muted-foreground border-t pt-4">
                                         <div className="flex items-center gap-1">
