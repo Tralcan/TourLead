@@ -9,22 +9,17 @@ export default function LoginPage() {
     const supabase = createClient()
 
     const handleGoogleLogin = async (userType: 'guide' | 'company') => {
-        // Para esta prueba, hardcodeamos la URL de redirección a la de producción.
-        // El objetivo es eliminar cualquier variable del lado del cliente y forzar la URL
-        // que debería estar en la lista blanca de Supabase.
-        const hardcodedRedirectTo = 'https://tourlead.vercel.app/auth/callback';
+        const redirectTo = `${window.location.origin}/auth/callback`;
 
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: hardcodedRedirectTo,
+                redirectTo,
             },
         })
 
         if (error) {
-            // Este error probablemente no sea visible para el usuario, ya que es redirigido.
             console.error(`Error de inicio de sesión de Supabase: ${error.message}`);
-            alert(`Error de Supabase al intentar iniciar sesión: ${error.message}`);
         }
     }
 
