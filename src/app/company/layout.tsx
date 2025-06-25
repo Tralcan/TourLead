@@ -2,10 +2,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, Search, Users, PanelLeft, UserCircle } from 'lucide-react';
+import { Building2, Search, Users, PanelLeft, UserCircle, Mountain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Logo } from '@/components/logo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const navItems = [
@@ -22,7 +21,18 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
         <div className="flex min-h-screen w-full flex-col bg-muted/40">
             <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
                 <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
-                    <Logo />
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Link
+                                href="/"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-colors hover:bg-accent/90 md:h-8 md:w-8"
+                            >
+                                <Mountain className="h-5 w-5" />
+                                <span className="sr-only">TourLead Connect</span>
+                            </Link>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">Página Principal</TooltipContent>
+                    </Tooltip>
                     {navItems.map((item) => (
                         <Tooltip key={item.href}>
                             <TooltipTrigger asChild>
