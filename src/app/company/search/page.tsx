@@ -4,7 +4,11 @@
 import React from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, DollarSign, User } from "lucide-react";
+import { Calendar as CalendarIcon, DollarSign, User, Loader2 } from "lucide-react";
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
+
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -26,6 +30,13 @@ import { cn } from "@/lib/utils";
 import { StarRatingDisplay } from "@/components/star-rating";
 import { createClient } from "@/lib/supabase/client";
 import { Guide } from "@/lib/types";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { createOffer } from "@/app/actions/offers";
+
 
 const supabase = createClient();
 
@@ -57,8 +68,108 @@ const toYYYYMMDD = (date: Date) => {
     return d.toISOString().split('T')[0];
 }
 
+const offerFormSchema = z.object({
+    job_type: z.string().min(1, "El tipo de trabajo es requerido."),
+    description: z.string().min(10, "La descripción debe tener al menos 10 caracteres.").max(500, "La descripción no puede exceder los 500 caracteres."),
+  });
+type OfferFormValues = z.infer<typeof offerFormSchema>;
+
+function OfferDialog({ 
+    guide, 
+    startDate, 
+    endDate, 
+    isOpen, 
+    onOpenChange 
+}: { 
+    guide: Guide, 
+    startDate: Date, 
+    endDate: Date, 
+    isOpen: boolean, 
+    onOpenChange: (open: boolean) => void 
+}) {
+    const { toast } = useToast();
+    const form = useForm<OfferFormValues>({
+        resolver: zodResolver(offerFormSchema),
+        defaultValues: { job_type: "", description: "" }
+    });
+    const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+    const onSubmit = async (values: OfferFormValues) => {
+        setIsSubmitting(true);
+        
+        const formData = new FormData();
+        formData.append('guideId', guide.id);
+        formData.append('startDate', toYYYYMMDD(startDate));
+        formData.append('endDate', toYYYYMMDD(endDate));
+        formData.append('jobType', values.job_type);
+        formData.append('description', values.description);
+
+        const result = await createOffer(formData);
+        
+        if (result.success) {
+            toast({ title: "¡Oferta Enviada!", description: `Tu oferta ha sido enviada a ${guide.name}.` });
+            onOpenChange(false);
+            form.reset();
+        } else {
+            toast({ title: "Error", description: result.message, variant: "destructive" });
+        }
+        setIsSubmitting(false);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Hacer una Oferta a {guide.name}</DialogTitle>
+                    <DialogDescription>
+                        Fechas seleccionadas: {format(startDate, "PPP", { locale: es })} - {format(endDate, "PPP", { locale: es })}
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="job_type"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Tipo de Trabajo</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ej. Tour por el centro histórico" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="description"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Descripción de la Oferta</FormLabel>
+                              <FormControl>
+                                <Textarea placeholder="Describe los detalles del trabajo, responsabilidades, etc." {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                            <Button type="submit" disabled={isSubmitting} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {isSubmitting ? "Enviando..." : "Enviar Oferta"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 
 export default function SearchGuidesPage() {
+    const { toast } = useToast();
     const [startDate, setStartDate] = React.useState<Date | undefined>();
     const [endDate, setEndDate] = React.useState<Date | undefined>();
     const [specialty, setSpecialty] = React.useState<string>('');
@@ -67,9 +178,13 @@ export default function SearchGuidesPage() {
     const [allGuides, setAllGuides] = React.useState<Guide[]>([]);
     const [filteredGuides, setFilteredGuides] = React.useState<Guide[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [isSearching, setIsSearching] = React.useState(false);
     const [specialtiesList, setSpecialtiesList] = React.useState<string[]>([]);
     const [languagesList, setLanguagesList] = React.useState<string[]>([]);
     const [hasSearched, setHasSearched] = React.useState(false);
+
+    const [selectedGuide, setSelectedGuide] = React.useState<Guide | null>(null);
+    const [isOfferDialogOpen, setIsOfferDialogOpen] = React.useState(false);
 
     React.useEffect(() => {
         async function fetchGuides() {
@@ -79,6 +194,7 @@ export default function SearchGuidesPage() {
 
                 if (guidesError) {
                     console.error("SearchPage: Fallo al obtener guías:", guidesError);
+                    toast({ title: "Error", description: "No se pudieron cargar los guías.", variant: "destructive" });
                     setIsLoading(false);
                     return; 
                 }
@@ -102,14 +218,16 @@ export default function SearchGuidesPage() {
                 }
             } catch (error) {
                 console.error("SearchPage: Ocurrió un error inesperado al obtener guías:", error);
+                toast({ title: "Error", description: "Ocurrió un error inesperado al obtener guías.", variant: "destructive" });
             } finally {
                 setIsLoading(false);
             }
         }
         fetchGuides();
-    }, []);
+    }, [toast]);
 
     const handleSearch = () => {
+        setIsSearching(true);
         setHasSearched(true);
         let guides = [...allGuides];
         
@@ -129,18 +247,28 @@ export default function SearchGuidesPage() {
                 
                 let currentDate = new Date(startDate);
                 while (currentDate <= endDate) {
-                    if (availableDates.has(toYYYYMMDD(currentDate))) {
-                        return true;
+                    if (!availableDates.has(toYYYYMMDD(currentDate))) {
+                        return false; // If any date in the range is not available, exclude the guide
                     }
                     currentDate.setDate(currentDate.getDate() + 1);
                 }
-                return false;
+                return true; // All dates in the range are available
             });
         }
         
         setFilteredGuides(guides);
+        setIsSearching(false);
     }
     
+    const handleOfferClick = (guide: Guide) => {
+        if (!startDate || !endDate) {
+            toast({ title: "Fechas Requeridas", description: "Por favor, selecciona una fecha de inicio y fin para hacer una oferta.", variant: "destructive" });
+            return;
+        }
+        setSelectedGuide(guide);
+        setIsOfferDialogOpen(true);
+    };
+
     return (
         <div className="space-y-6">
             <Card>
@@ -209,12 +337,15 @@ export default function SearchGuidesPage() {
                     </div>
                 </CardContent>
                 <CardFooter>
-                    <Button onClick={handleSearch} className="bg-accent text-accent-foreground hover:bg-accent/90">Buscar Guías</Button>
+                    <Button onClick={handleSearch} disabled={isSearching} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                        {isSearching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Buscar Guías
+                    </Button>
                 </CardFooter>
             </Card>
 
             {isLoading ? (
-                <p className="text-center">Cargando...</p>
+                <p className="text-center">Cargando guías...</p>
             ) : hasSearched ? (
                 filteredGuides.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -245,7 +376,7 @@ export default function SearchGuidesPage() {
                                     </div>
                                 </CardContent>
                                 <CardFooter>
-                                    <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+                                    <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => handleOfferClick(guide)}>
                                         <User className="mr-2 h-4 w-4" />
                                         Ver Perfil y Ofertar
                                     </Button>
@@ -264,6 +395,16 @@ export default function SearchGuidesPage() {
                     <CardTitle>Realiza una búsqueda</CardTitle>
                     <CardDescription>Utiliza los filtros de arriba para encontrar al guía perfecto.</CardDescription>
                 </Card>
+            )}
+
+            {selectedGuide && startDate && endDate && (
+                <OfferDialog
+                    guide={selectedGuide}
+                    startDate={startDate}
+                    endDate={endDate}
+                    isOpen={isOfferDialogOpen}
+                    onOpenChange={setIsOfferDialogOpen}
+                />
             )}
         </div>
     );
