@@ -63,13 +63,6 @@ async function getGuideRating(guideId: string) {
     return result;
 }
 
-const formatLocalDate = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
-
 const offerFormSchema = z.object({
     job_type: z.string().min(1, "El tipo de trabajo es requerido."),
     description: z.string().min(10, "La descripción debe tener al menos 10 caracteres.").max(500, "La descripción no puede exceder los 500 caracteres."),
@@ -186,8 +179,8 @@ function OfferDialog({
         
         const formData = new FormData();
         formData.append('guideId', guide.id);
-        formData.append('startDate', formatLocalDate(startDate));
-        formData.append('endDate', formatLocalDate(endDate));
+        formData.append('startDate', format(startDate, 'yyyy-MM-dd'));
+        formData.append('endDate', format(endDate, 'yyyy-MM-dd'));
         formData.append('jobType', values.job_type);
         formData.append('description', values.description);
 
@@ -339,7 +332,7 @@ export default function SearchGuidesPage() {
             const requiredDates: string[] = [];
             let currentDate = new Date(startDate);
             while (currentDate <= endDate) {
-                requiredDates.push(formatLocalDate(new Date(currentDate)));
+                requiredDates.push(format(currentDate, 'yyyy-MM-dd'));
                 currentDate.setDate(currentDate.getDate() + 1);
             }
 
@@ -536,5 +529,3 @@ export default function SearchGuidesPage() {
         </div>
     );
 }
-
-    

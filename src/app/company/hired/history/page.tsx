@@ -55,7 +55,7 @@ export default function HiredHistoryPage() {
         }
 
         try {
-            const today = new Date().toISOString();
+            const today = new Date().toISOString().split('T')[0];
             const { data, error } = await supabase
                 .from('commitments')
                 .select('id, job_type, start_date, end_date, guide_rating, guide:guides(id, name, email, phone, avatar)')
@@ -102,8 +102,8 @@ export default function HiredHistoryPage() {
             'Email Guía': item.guide.email,
             'Teléfono Guía': item.guide.phone,
             'Trabajo': item.job_type,
-            'Fecha Inicio': format(new Date(item.start_date), "yyyy-MM-dd"),
-            'Fecha Fin': format(new Date(item.end_date), "yyyy-MM-dd"),
+            'Fecha Inicio': format(new Date(item.start_date.replace(/-/g, '/')), "yyyy-MM-dd"),
+            'Fecha Fin': format(new Date(item.end_date.replace(/-/g, '/')), "yyyy-MM-dd"),
             'Calificación': item.guide_rating || 'N/A'
         }));
 
@@ -163,7 +163,7 @@ export default function HiredHistoryPage() {
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    {format(new Date(item.start_date), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date), "d MMM, yyyy", { locale: es })}
+                                    {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
                                 </TableCell>
                                 <TableCell><Badge variant="secondary">{item.job_type}</Badge></TableCell>
                                 <TableCell className="text-right">

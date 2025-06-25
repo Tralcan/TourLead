@@ -75,8 +75,8 @@ export async function createOffer(formData: FormData) {
             guideName: guideData.name || 'Guía',
             companyName: companyData.name || 'Una empresa',
             jobType: jobType,
-            startDate: new Date(startDate),
-            endDate: new Date(endDate)
+            startDate: new Date(startDate.replace(/-/g, '/')),
+            endDate: new Date(endDate.replace(/-/g, '/'))
         });
     } catch (emailError) {
         console.error("Error al enviar el email:", emailError);

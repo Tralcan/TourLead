@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -55,8 +56,8 @@ export default function OffersPage() {
                 const { rating, reviews } = await getCompanyRating(company.id);
                 return {
                     ...offer,
-                    startDate: new Date(offer.start_date!),
-                    endDate: new Date(offer.end_date!),
+                    startDate: new Date(offer.start_date!.replace(/-/g, '/')),
+                    endDate: new Date(offer.end_date!.replace(/-/g, '/')),
                     company: { ...company, rating, reviews }
                 } as unknown as JobOffer;
             }));

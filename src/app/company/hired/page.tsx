@@ -108,7 +108,7 @@ export default function HiredGuidesPage() {
             }
 
             try {
-                const today = new Date().toISOString();
+                const today = new Date().toISOString().split('T')[0];
 
                 const [commitmentsRes, offersRes] = await Promise.all([
                     supabase.from('commitments').select('id, job_type, start_date, end_date, guide:guides(*)').eq('company_id', user.id).gte('end_date', today),
@@ -139,7 +139,7 @@ export default function HiredGuidesPage() {
                     guide: item.guide as GuideInfo,
                 }));
 
-                setGuidesList([...acceptedGuides, ...pendingGuides].sort((a,b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()));
+                setGuidesList([...acceptedGuides, ...pendingGuides].sort((a,b) => new Date(a.start_date.replace(/-/g, '/')).getTime() - new Date(b.start_date.replace(/-/g, '/')).getTime()));
 
             } catch (error) {
                 console.error(error);
@@ -204,7 +204,7 @@ export default function HiredGuidesPage() {
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    {format(new Date(item.start_date), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date), "d MMM, yyyy", { locale: es })}
+                                    {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
                                 </TableCell>
                                 <TableCell>{item.job_type}</TableCell>
                                 <TableCell>

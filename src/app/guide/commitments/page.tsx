@@ -1,3 +1,4 @@
+
 "use client"
 import React from 'react';
 import {
@@ -52,8 +53,8 @@ export default function CommitmentsPage() {
         if (data) {
             const transformedData = data.map(c => ({
                 ...c,
-                startDate: new Date(c.start_date!),
-                endDate: new Date(c.end_date!),
+                startDate: new Date(c.start_date!.replace(/-/g, '/')),
+                endDate: new Date(c.end_date!.replace(/-/g, '/')),
             })) as unknown as Commitment[];
             setCommitments(transformedData);
         } else {
