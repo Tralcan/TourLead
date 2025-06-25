@@ -1,4 +1,6 @@
 
+'use server';
+
 import { Resend } from 'resend';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -20,7 +22,7 @@ export async function sendOfferEmail({ to, guideName, companyName, jobType, star
         throw new Error("La configuración del servicio de correo está incompleta.");
     }
 
-    const from = 'TourLead <onboarding@resend.dev>'; // Resend requiere un dominio verificado, 'onboarding@resend.dev' es para pruebas.
+    const from = 'TourLead <tourlead@notifications.cl>';
     const subject = `¡Tienes una nueva oferta de trabajo de ${companyName}!`;
     const formattedStartDate = format(startDate, "d 'de' MMMM 'de' yyyy", { locale: es });
     const formattedEndDate = format(endDate, "d 'de' MMMM 'de' yyyy", { locale: es });
