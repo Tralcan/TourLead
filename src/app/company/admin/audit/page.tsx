@@ -29,7 +29,7 @@ import { Badge } from '@/components/ui/badge';
 const supabase = createClient();
 
 type SubscriptionRecord = {
-    id: number;
+    id: string; // Corrected from number to string to handle UUIDs
     start_date: string;
     end_date: string;
     company_id: string;
@@ -90,7 +90,7 @@ export default function AuditPage() {
                     adminName: companiesMap.get(sub.admin_id) || 'Admin Desconocido',
                     cancelingAdminName: sub.canceled_by_admin_id ? (companiesMap.get(sub.canceled_by_admin_id) || 'Admin Desconocido') : null,
                 }));
-                setAuditLog(log);
+                setAuditLog(log as SubscriptionRecord[]);
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Error desconocido";
@@ -114,7 +114,7 @@ export default function AuditPage() {
         setIsCanceling(true);
 
         const formData = new FormData();
-        formData.append('subscriptionId', String(selectedSubscription.id));
+        formData.append('subscriptionId', selectedSubscription.id);
 
         const result = await cancelSubscription(formData);
         

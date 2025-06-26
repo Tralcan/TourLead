@@ -71,19 +71,12 @@ export async function cancelSubscription(formData: FormData) {
         return { success: false, message: 'No tienes permisos para realizar esta acción.' };
     }
     
-    const subscriptionIdFromForm = formData.get('subscriptionId');
+    const subscriptionId = formData.get('subscriptionId');
 
-    if (subscriptionIdFromForm === null || subscriptionIdFromForm === undefined) {
-         return { success: false, message: "ID de suscripción no proporcionado." };
+    if (!subscriptionId || typeof subscriptionId !== 'string') {
+         return { success: false, message: "ID de suscripción inválido o no proporcionado." };
     }
     
-    const parsedId = Number(subscriptionIdFromForm);
-    
-    if (isNaN(parsedId)) {
-        return { success: false, message: `El valor proporcionado '${subscriptionIdFromForm}' no es un número válido.` };
-    }
-
-    const subscriptionId = parsedId;
     const today = new Date().toISOString();
 
     const { error: updateError } = await supabase.from('subscriptions').update({
