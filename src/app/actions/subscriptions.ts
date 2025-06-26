@@ -75,9 +75,7 @@ export async function cancelSubscription(formData: FormData) {
         return { success: false, message: 'No tienes permisos para realizar esta acción.' };
     }
     
-    const rawData = {
-        subscriptionId: formData.get('subscriptionId')
-    };
+    const rawData = Object.fromEntries(formData.entries());
     
     const parsed = cancelSubscriptionSchema.safeParse(rawData);
 
