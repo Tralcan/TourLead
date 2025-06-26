@@ -141,6 +141,8 @@ export default function AuditPage() {
                             <TableRow>
                                 <TableCell colSpan={4} className="text-center text-muted-foreground">
                                     No hay registros de suscripción.
+                                    <br />
+                                    <span className="text-xs">(Si el problema persiste, revisa las políticas de lectura RLS en Supabase.)</span>
                                 </TableCell>
                             </TableRow>
                         )}

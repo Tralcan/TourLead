@@ -526,6 +526,9 @@ export default function SearchGuidesPage() {
                 </CardHeader>
                 <CardContent>
                     <p>Por favor, contacta con el administrador para activar tu acceso a esta funcionalidad.</p>
+                     <p className="text-xs text-muted-foreground mt-2">
+                        Si crees que esto es un error, podría deberse a un problema de permisos de lectura en la base de datos (RLS).
+                    </p>
                 </CardContent>
             </Card>
         );
