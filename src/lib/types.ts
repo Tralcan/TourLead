@@ -48,7 +48,7 @@ export type Commitment = {
   company_id: string; // UUID de la empresa
   guide_id: string; // UUID del guía
   job_type: string | null;
-  description: string | null;
+  offer?: { description: string | null } | null;
   startDate: Date;
   endDate: Date;
   guide_rating?: number | null;

@@ -91,7 +91,6 @@ const acceptOfferSchema = z.object({
     guideId: z.string().uuid(),
     companyId: z.string().uuid(),
     jobType: z.string().nullable(),
-    description: z.string().nullable(),
     startDate: z.string(),
     endDate: z.string(),
 });
@@ -111,15 +110,25 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
     }
 
     // 2. Create commitment
+    const { data: offerData, error: offerError } = await supabase
+        .from('offers')
+        .select('description')
+        .eq('id', data.offerId)
+        .single();
+
+    if(offerError) {
+        console.error("Error al obtener descripción de la oferta:", offerError);
+    }
+    
     const { error: insertError } = await supabase
         .from('commitments')
         .insert({
             guide_id: data.guideId,
             company_id: data.companyId,
             job_type: data.jobType,
-            description: data.description,
             start_date: data.startDate,
             end_date: data.endDate,
+            offer_id: data.offerId,
         });
     
     if (insertError) {

@@ -125,10 +125,10 @@ function CommitmentDetailsDialog({ commitment, isOpen, onOpenChange }: { commitm
                             {format(commitment.startDate, "d 'de' MMMM, yyyy", { locale: es })} - {format(commitment.endDate, "d 'de' MMMM, yyyy", { locale: es })}
                         </p>
                     </div>
-                    {commitment.description && (
+                    {commitment.offer?.description && (
                          <div>
                             <h4 className="font-semibold text-sm mb-2">Descripción del Trabajo</h4>
-                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{commitment.description}</p>
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{commitment.offer.description}</p>
                         </div>
                     )}
                 </div>
@@ -167,12 +167,12 @@ export default function CommitmentsPage() {
                 .select(`
                     id,
                     job_type,
-                    description,
                     start_date,
                     end_date,
                     guide_rating,
                     company_rating,
-                    company(*)
+                    company:companies(*),
+                    offer:offers(description)
                 `)
                 .eq('guide_id', user.id)
                 .gte('end_date', today)
@@ -199,9 +199,10 @@ export default function CommitmentsPage() {
             }
         } catch (error) {
             console.error("Error al cargar compromisos:", error);
+            const errorMessage = error instanceof Error ? error.message : "Error desconocido";
             toast({ 
                 title: "Error", 
-                description: `No se pudieron cargar los compromisos.`, 
+                description: `No se pudieron cargar los compromisos: ${errorMessage}`, 
                 variant: "destructive" 
             });
         } finally {
