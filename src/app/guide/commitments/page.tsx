@@ -107,12 +107,49 @@ function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Comp
     )
 }
 
+function CommitmentDetailsDialog({ commitment, isOpen, onOpenChange }: { commitment: Commitment, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+    if (!commitment) return null;
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{commitment.job_type}</DialogTitle>
+                    <DialogDescription>
+                        Para la empresa: {commitment.company.name}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                    <div>
+                        <h4 className="font-semibold text-sm mb-2">Fechas</h4>
+                        <p className="text-sm text-muted-foreground">
+                            {format(commitment.startDate, "d 'de' MMMM, yyyy", { locale: es })} - {format(commitment.endDate, "d 'de' MMMM, yyyy", { locale: es })}
+                        </p>
+                    </div>
+                    {commitment.description && (
+                         <div>
+                            <h4 className="font-semibold text-sm mb-2">Descripción del Trabajo</h4>
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{commitment.description}</p>
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+                        Cerrar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 export default function CommitmentsPage() {
     const { toast } = useToast();
     const [commitments, setCommitments] = React.useState<Commitment[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null);
     const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false);
+    const [selectedCommitment, setSelectedCommitment] = React.useState<Commitment | null>(null);
+    const [isDetailsDialogOpen, setIsDetailsDialogOpen] = React.useState(false);
 
     const fetchCommitments = React.useCallback(async () => {
         setIsLoading(true);
@@ -129,6 +166,7 @@ export default function CommitmentsPage() {
             .select(`
                 id,
                 job_type,
+                description,
                 start_date,
                 end_date,
                 guide_rating,
@@ -181,6 +219,11 @@ export default function CommitmentsPage() {
         setIsProfileDialogOpen(true);
     };
 
+    const handleViewDetails = (commitment: Commitment) => {
+        setSelectedCommitment(commitment);
+        setIsDetailsDialogOpen(true);
+    };
+
     return (
         <Card>
             <CardHeader className="flex-row items-center justify-between">
@@ -221,7 +264,9 @@ export default function CommitmentsPage() {
                                     {format(commitment.startDate, "d MMM, yyyy", { locale: es })} - {format(commitment.endDate, "d MMM, yyyy", { locale: es })}
                                 </TableCell>
                                 <TableCell>
-                                    <Badge variant="default" className="bg-primary/20 text-primary-foreground hover:bg-primary/30">{commitment.job_type}</Badge>
+                                    <button onClick={() => handleViewDetails(commitment)} className="p-0 m-0 border-0 bg-transparent text-left cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
+                                        <Badge variant="default" className="bg-primary/20 text-primary-foreground hover:bg-primary/30 pointer-events-none">{commitment.job_type}</Badge>
+                                    </button>
                                 </TableCell>
                                 <TableCell>
                                     {isPast(commitment.endDate) ? (
@@ -256,6 +301,7 @@ export default function CommitmentsPage() {
                     </TableBody>
                 </Table>
             </CardContent>
+            {selectedCommitment && <CommitmentDetailsDialog commitment={selectedCommitment} isOpen={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen} />}
             {selectedCompany && <CompanyProfileDialog company={selectedCompany} isOpen={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen} />}
         </Card>
     );

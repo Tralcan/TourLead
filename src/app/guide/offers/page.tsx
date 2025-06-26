@@ -163,6 +163,7 @@ export default function OffersPage() {
             guideId: offer.guide_id,
             companyId: offer.company.id,
             jobType: offer.job_type,
+            description: offer.description,
             startDate: format(offer.startDate, 'yyyy-MM-dd'),
             endDate: format(offer.endDate, 'yyyy-MM-dd'),
         });

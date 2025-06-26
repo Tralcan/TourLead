@@ -91,6 +91,7 @@ const acceptOfferSchema = z.object({
     guideId: z.string().uuid(),
     companyId: z.string().uuid(),
     jobType: z.string().nullable(),
+    description: z.string().nullable(),
     startDate: z.string(),
     endDate: z.string(),
 });
@@ -116,6 +117,7 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
             guide_id: data.guideId,
             company_id: data.companyId,
             job_type: data.jobType,
+            description: data.description,
             start_date: data.startDate,
             end_date: data.endDate,
         });
