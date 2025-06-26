@@ -3,8 +3,29 @@ import { ArrowRight, Briefcase, Building, MapPin, Users, LogIn } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
+import { createClient } from '@/lib/supabase/server';
 
-export default function Home() {
+export default async function Home() {
+  const supabase = createClient();
+
+  const { count: guideCount } = await supabase
+    .from('guides')
+    .select('id', { count: 'exact', head: true });
+
+  const { data: availabilityData } = await supabase
+    .from('guides')
+    .select('availability');
+  
+  let totalDays = 0;
+  if (availabilityData) {
+    totalDays = availabilityData.reduce((acc, guide) => {
+      return acc + (guide.availability?.length || 0);
+    }, 0);
+  }
+  
+  const displayGuideCount = guideCount ?? 0;
+  const displayTotalDays = totalDays;
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -22,9 +43,14 @@ export default function Home() {
           <h1 className="text-4xl md:text-6xl font-bold font-headline tracking-tight text-foreground">
             Encuentra tu Próximo Guía Turístico. Sin Complicaciones.
           </h1>
-          <p className="mt-4 max-w-2xl mx-auto text-lg md:text-xl text-muted-foreground">
+          <p className="mt-4 max-w-3xl mx-auto text-lg md:text-xl text-muted-foreground">
             TourLead Connect es la plataforma principal para que las empresas de tours descubran y contraten guías profesionales para su próxima aventura.
           </p>
+          <div className="mt-6 max-w-3xl mx-auto">
+            <p className="text-muted-foreground">
+              Explora una red de <strong className="text-foreground font-semibold">{displayGuideCount.toLocaleString('es-CL')} guías profesionales</strong> con más de <strong className="text-foreground font-semibold">{displayTotalDays.toLocaleString('es-CL')} días de disponibilidad</strong> combinada.
+            </p>
+          </div>
           <div className="mt-8 flex justify-center gap-4">
             <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90" asChild>
               <Link href="/company">

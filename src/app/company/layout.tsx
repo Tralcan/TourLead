@@ -83,6 +83,10 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
         )
     }
 
+    if (!user) {
+        return null;
+    }
+
     return (
       <TooltipProvider>
         <div className="flex min-h-screen w-full flex-col bg-muted/40">
