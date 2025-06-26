@@ -22,6 +22,7 @@ export async function createSubscription(data: { companyId: string, startDate: D
         .from('admins')
         .select('user_id')
         .eq('user_id', user.id)
+        .eq('is_active', true)
         .single();
     
     if (adminError || !adminData) {
@@ -52,7 +53,7 @@ export async function createSubscription(data: { companyId: string, startDate: D
 }
 
 const cancelSubscriptionSchema = z.object({
-    subscriptionId: z.number(),
+    subscriptionId: z.coerce.number(),
 });
 
 export async function cancelSubscription(data: z.infer<typeof cancelSubscriptionSchema>) {
