@@ -111,7 +111,8 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
         .from('commitments')
         .select('id')
         .eq('guide_id', data.guideId)
-        .or(`[start_date,end_date].overlaps.[${data.startDate},${data.endDate}]`);
+        .lte('start_date', data.endDate)
+        .gte('end_date', data.startDate);
 
     if (commitmentError) {
         console.error("Error checking for commitment conflicts:", commitmentError);
