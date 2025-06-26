@@ -16,12 +16,31 @@ import { Button } from "@/components/ui/button";
 import { format, isPast } from "date-fns";
 import { es } from "date-fns/locale";
 import { History, User as UserIcon, Phone, Smartphone, MapPin } from "lucide-react";
-import { RateEntity } from '@/components/star-rating';
+import { RateEntity, StarRatingDisplay } from '@/components/star-rating';
 import { Commitment, Company } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+const supabase = createClient();
+
+async function getCompanyRating(companyId: string) {
+    const { data, error } = await supabase
+        .from('commitments')
+        .select('company_rating')
+        .eq('company_id', companyId)
+        .not('company_rating', 'is', null);
+
+    if (error || !data || data.length === 0) {
+        return { rating: 0, reviews: 0 };
+    }
+
+    const totalRating = data.reduce((acc, curr) => acc + (curr.company_rating || 0), 0);
+    const averageRating = totalRating / data.length;
+    return { rating: averageRating, reviews: data.length };
+}
+
 
 function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Company, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
     if (!company) return null;
@@ -33,11 +52,12 @@ function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Comp
                         <AvatarImage src={company.avatar ?? ''} alt={company.name ?? ''} />
                         <AvatarFallback>{company.name?.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1 space-y-1">
                         <DialogTitle className="text-2xl">{company.name}</DialogTitle>
                         <DialogDescription>
                             {company.email}
                         </DialogDescription>
+                         <StarRatingDisplay rating={company.rating ?? 0} reviews={company.reviews} />
                     </div>
                 </DialogHeader>
                 <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
@@ -89,7 +109,6 @@ function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Comp
 
 export default function CommitmentsPage() {
     const { toast } = useToast();
-    const supabase = createClient();
     const [commitments, setCommitments] = React.useState<Commitment[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null);
@@ -121,12 +140,17 @@ export default function CommitmentsPage() {
             .order('start_date', { ascending: true });
         
         if (data) {
-            const transformedData = data.map(c => ({
-                ...c,
-                startDate: new Date(c.start_date!.replace(/-/g, '/')),
-                endDate: new Date(c.end_date!.replace(/-/g, '/')),
-            })) as unknown as Commitment[];
-            setCommitments(transformedData);
+            const transformedData = await Promise.all(data.map(async (c) => {
+                const company = c.company as Company;
+                const { rating, reviews } = await getCompanyRating(company.id);
+                return {
+                    ...c,
+                    startDate: new Date(c.start_date!.replace(/-/g, '/')),
+                    endDate: new Date(c.end_date!.replace(/-/g, '/')),
+                    company: { ...company, rating, reviews }
+                }
+            }));
+            setCommitments(transformedData as unknown as Commitment[]);
         } else {
             console.error(error);
             toast({ title: "Error", description: "No se pudieron cargar los compromisos.", variant: "destructive" });

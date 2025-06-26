@@ -23,6 +23,25 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
+const supabase = createClient();
+
+async function getCompanyRating(companyId: string) {
+    const { data, error } = await supabase
+        .from('commitments')
+        .select('company_rating')
+        .eq('company_id', companyId)
+        .not('company_rating', 'is', null);
+
+    if (error || !data || data.length === 0) {
+        return { rating: 0, reviews: 0 };
+    }
+
+    const totalRating = data.reduce((acc, curr) => acc + (curr.company_rating || 0), 0);
+    const averageRating = totalRating / data.length;
+    return { rating: averageRating, reviews: data.length };
+}
+
+
 type ReputationData = {
     job_type: string | null;
     guide_rating: number | null;
@@ -41,11 +60,12 @@ function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Comp
                         <AvatarImage src={company.avatar ?? ''} alt={company.name ?? ''} />
                         <AvatarFallback>{company.name?.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1 space-y-1">
                         <DialogTitle className="text-2xl">{company.name}</DialogTitle>
                         <DialogDescription>
                             {company.email}
                         </DialogDescription>
+                         <StarRatingDisplay rating={company.rating ?? 0} reviews={company.reviews} />
                     </div>
                 </DialogHeader>
                 <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
@@ -97,7 +117,6 @@ function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Comp
 
 export default function ReputationPage() {
     const { toast } = useToast();
-    const supabase = createClient();
     const [reputationData, setReputationData] = React.useState<ReputationData[]>([]);
     const [averageRating, setAverageRating] = React.useState(0);
     const [totalReviews, setTotalReviews] = React.useState(0);
@@ -133,7 +152,15 @@ export default function ReputationPage() {
                     setTotalReviews(ratedCommitments.length);
 
                     const displayableData = data.filter(c => c.guide_rating !== null && c.company_rating !== null && c.company);
-                    setReputationData(displayableData as ReputationData[]);
+                    const finalData = await Promise.all(displayableData.map(async (item) => {
+                        const company = item.company as Company;
+                        const { rating, reviews } = await getCompanyRating(company.id);
+                        return {
+                            ...item,
+                            company: { ...company, rating, reviews },
+                        };
+                    }));
+                    setReputationData(finalData as ReputationData[]);
                 }
             } catch (error) {
                 console.error(error);

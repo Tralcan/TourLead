@@ -46,11 +46,12 @@ function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Comp
                         <AvatarImage src={company.avatar ?? ''} alt={company.name ?? ''} />
                         <AvatarFallback>{company.name?.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1 space-y-1">
                         <DialogTitle className="text-2xl">{company.name}</DialogTitle>
                         <DialogDescription>
                             {company.email}
                         </DialogDescription>
+                         <StarRatingDisplay rating={company.rating ?? 0} reviews={company.reviews} />
                     </div>
                 </DialogHeader>
                 <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">

@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { RateEntity } from "@/components/star-rating";
+import { RateEntity, StarRatingDisplay } from "@/components/star-rating";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,23 @@ import { Company } from '@/lib/types';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+const supabase = createClient();
+
+async function getCompanyRating(companyId: string) {
+    const { data, error } = await supabase
+        .from('commitments')
+        .select('company_rating')
+        .eq('company_id', companyId)
+        .not('company_rating', 'is', null);
+
+    if (error || !data || data.length === 0) {
+        return { rating: 0, reviews: 0 };
+    }
+
+    const totalRating = data.reduce((acc, curr) => acc + (curr.company_rating || 0), 0);
+    const averageRating = totalRating / data.length;
+    return { rating: averageRating, reviews: data.length };
+}
 
 type CommitmentHistory = {
     id: number;
@@ -44,11 +61,12 @@ function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Comp
                         <AvatarImage src={company.avatar ?? ''} alt={company.name ?? ''} />
                         <AvatarFallback>{company.name?.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1 space-y-1">
                         <DialogTitle className="text-2xl">{company.name}</DialogTitle>
                         <DialogDescription>
                             {company.email}
                         </DialogDescription>
+                         <StarRatingDisplay rating={company.rating ?? 0} reviews={company.reviews} />
                     </div>
                 </DialogHeader>
                 <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
@@ -100,7 +118,6 @@ function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Comp
 
 export default function CommitmentsHistoryPage() {
     const { toast } = useToast();
-    const supabase = createClient();
     const [history, setHistory] = React.useState<CommitmentHistory[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null);
@@ -134,7 +151,15 @@ export default function CommitmentsHistoryPage() {
             if (error) throw error;
 
             if (data) {
-                setHistory(data as CommitmentHistory[]);
+                 const transformedData = await Promise.all(data.map(async (c) => {
+                    const company = c.company as Company;
+                    const { rating, reviews } = await getCompanyRating(company.id);
+                    return {
+                        ...c,
+                        company: { ...company, rating, reviews }
+                    }
+                }));
+                setHistory(transformedData as CommitmentHistory[]);
             }
 
         } catch (error) {

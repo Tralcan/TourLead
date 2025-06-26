@@ -20,6 +20,30 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { History } from "lucide-react";
+import { StarRatingDisplay } from "@/components/star-rating";
+
+const supabase = createClient();
+
+async function getGuideRating(guideId: string) {
+    const { data, error } = await supabase
+        .from('commitments')
+        .select('guide_rating')
+        .eq('guide_id', guideId)
+        .not('guide_rating', 'is', null);
+
+    if (error) {
+        return { rating: 0, reviews: 0 };
+    }
+    
+    if (!data || data.length === 0) {
+        return { rating: 0, reviews: 0 };
+    }
+
+    const totalRating = data.reduce((acc, curr) => acc + (curr.guide_rating || 0), 0);
+    const averageRating = totalRating / data.length;
+    const result = { rating: parseFloat(averageRating.toFixed(1)), reviews: data.length };
+    return result;
+}
 
 type GuideInfo = {
     id: string;
@@ -31,6 +55,8 @@ type GuideInfo = {
     phone: string | null;
     summary: string | null;
     rate: number | null;
+    rating?: number;
+    reviews?: number;
 }
 
 type GuideStatus = {
@@ -51,11 +77,12 @@ function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: GuideInfo,
                         <AvatarImage src={guide.avatar ?? ''} alt={guide.name ?? ''} />
                         <AvatarFallback>{guide.name?.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1 space-y-1">
                         <DialogTitle className="text-2xl">{guide.name}</DialogTitle>
                         <DialogDescription>
                             {guide.email} {guide.phone && `• ${guide.phone}`}
                         </DialogDescription>
+                        <StarRatingDisplay rating={guide.rating ?? 0} reviews={guide.reviews} />
                     </div>
                 </DialogHeader>
                 <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
@@ -91,7 +118,6 @@ function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: GuideInfo,
 
 export default function HiredGuidesPage() {
     const { toast } = useToast();
-    const supabase = createClient();
     const [guidesList, setGuidesList] = React.useState<GuideStatus[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [selectedGuide, setSelectedGuide] = React.useState<GuideInfo | null>(null);
@@ -121,22 +147,30 @@ export default function HiredGuidesPage() {
                 const { data: offersData, error: offersError } = offersRes;
                 if (offersError) throw new Error(`Error al cargar ofertas: ${offersError.message}`);
 
-                const acceptedGuides: GuideStatus[] = (commitmentsData || []).map(item => ({
-                    id: item.id.toString(),
-                    status: 'Aceptado',
-                    job_type: item.job_type,
-                    start_date: item.start_date,
-                    end_date: item.end_date,
-                    guide: item.guide as GuideInfo,
+                const acceptedGuides: GuideStatus[] = await Promise.all((commitmentsData || []).map(async item => {
+                    const guide = item.guide as GuideInfo;
+                    const { rating, reviews } = await getGuideRating(guide.id);
+                    return {
+                        id: item.id.toString(),
+                        status: 'Aceptado',
+                        job_type: item.job_type,
+                        start_date: item.start_date,
+                        end_date: item.end_date,
+                        guide: { ...guide, rating, reviews },
+                    };
                 }));
 
-                const pendingGuides: GuideStatus[] = (offersData || []).map(item => ({
-                    id: item.id.toString(),
-                    status: 'Pendiente',
-                    job_type: item.job_type,
-                    start_date: item.start_date,
-                    end_date: item.end_date,
-                    guide: item.guide as GuideInfo,
+                const pendingGuides: GuideStatus[] = await Promise.all((offersData || []).map(async item => {
+                    const guide = item.guide as GuideInfo;
+                    const { rating, reviews } = await getGuideRating(guide.id);
+                    return {
+                        id: item.id.toString(),
+                        status: 'Pendiente',
+                        job_type: item.job_type,
+                        start_date: item.start_date,
+                        end_date: item.end_date,
+                        guide: { ...guide, rating, reviews },
+                    };
                 }));
 
                 setGuidesList([...acceptedGuides, ...pendingGuides].sort((a,b) => new Date(a.start_date.replace(/-/g, '/')).getTime() - new Date(b.start_date.replace(/-/g, '/')).getTime()));

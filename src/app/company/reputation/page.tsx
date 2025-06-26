@@ -23,6 +23,29 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
+const supabase = createClient();
+
+async function getGuideRating(guideId: string) {
+    const { data, error } = await supabase
+        .from('commitments')
+        .select('guide_rating')
+        .eq('guide_id', guideId)
+        .not('guide_rating', 'is', null);
+
+    if (error) {
+        return { rating: 0, reviews: 0 };
+    }
+    
+    if (!data || data.length === 0) {
+        return { rating: 0, reviews: 0 };
+    }
+
+    const totalRating = data.reduce((acc, curr) => acc + (curr.guide_rating || 0), 0);
+    const averageRating = totalRating / data.length;
+    const result = { rating: parseFloat(averageRating.toFixed(1)), reviews: data.length };
+    return result;
+}
+
 type ReputationData = {
     job_type: string | null;
     company_rating: number | null;
@@ -40,11 +63,12 @@ function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: Guide, isO
                         <AvatarImage src={guide.avatar ?? ''} alt={guide.name ?? ''} />
                         <AvatarFallback>{guide.name?.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1 space-y-1">
                         <DialogTitle className="text-2xl">{guide.name}</DialogTitle>
                         <DialogDescription>
                             {guide.email} {guide.phone && `• ${guide.phone}`}
                         </DialogDescription>
+                         <StarRatingDisplay rating={guide.rating ?? 0} reviews={guide.reviews} />
                     </div>
                 </DialogHeader>
                 <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
@@ -80,7 +104,6 @@ function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: Guide, isO
 
 export default function ReputationPage() {
     const { toast } = useToast();
-    const supabase = createClient();
     const [reputationData, setReputationData] = React.useState<ReputationData[]>([]);
     const [averageRating, setAverageRating] = React.useState(0);
     const [totalReviews, setTotalReviews] = React.useState(0);
@@ -116,7 +139,15 @@ export default function ReputationPage() {
                     setTotalReviews(ratedCommitments.length);
 
                     const displayableData = data.filter(c => c.company_rating !== null && c.guide_rating !== null && c.guide);
-                    setReputationData(displayableData as ReputationData[]);
+                     const finalData = await Promise.all(displayableData.map(async (item) => {
+                        const guide = item.guide as Guide;
+                        const { rating, reviews } = await getGuideRating(guide.id);
+                        return {
+                            ...item,
+                            guide: { ...guide, rating, reviews },
+                        };
+                    }));
+                    setReputationData(finalData as ReputationData[]);
                 }
             } catch (error) {
                 console.error(error);

@@ -44,7 +44,7 @@ export type JobOffer = {
 
 export type Commitment = {
   id: number; // id autoincremental del compromiso
-  company: Pick<Company, 'id' | 'name' | 'email'>;
+  company: Company;
   company_id: string; // UUID de la empresa
   guide_id: string; // UUID del guía
   job_type: string | null;
