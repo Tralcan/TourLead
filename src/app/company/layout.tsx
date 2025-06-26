@@ -32,16 +32,12 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
 
     React.useEffect(() => {
         const checkUserStatus = async () => {
-            console.log('--- [CompanyLayout] Iniciando verificación de estado de usuario ---');
             setIsLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
             
             if (user) {
-                console.log('[CompanyLayout] Usuario autenticado encontrado:', user);
-                console.log('[CompanyLayout] ID de usuario para la verificación:', user.id);
                 setUser(user);
 
-                // Ensure company profile exists, or create one
                 const { data: companyProfile, error: selectError } = await supabase
                     .from('companies')
                     .select('id')
@@ -53,7 +49,6 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                 }
 
                 if (!companyProfile) {
-                   console.log('[CompanyLayout] Perfil de empresa no encontrado, creando uno nuevo...');
                    const { error: insertError } = await supabase.from('companies').insert({
                         id: user.id,
                         email: user.email,
@@ -61,53 +56,40 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                     });
                     if (insertError) {
                         console.error("[CompanyLayout] Error al crear un nuevo perfil de empresa:", insertError);
-                    } else {
-                        console.log('[CompanyLayout] Perfil de empresa creado exitosamente.');
                     }
                 }
                 
-                // Check for admin privileges
-                console.log(`[CompanyLayout] >>> Realizando consulta a la tabla 'admins' con user_id: ${user.id}`);
-                const { data: adminData, error: adminError } = await supabase
+                // Check for admin privileges using a more efficient query.
+                const { count, error: adminError } = await supabase
                     .from('admins')
-                    .select('user_id')
+                    .select('*', { count: 'exact', head: true })
                     .eq('user_id', user.id)
-                    .single();
+                    .eq('is_active', true);
                 
-                console.log('[CompanyLayout] <<< Resultado de la consulta a "admins":');
-                console.log('[CompanyLayout] Datos (adminData):', adminData);
-                console.log('[CompanyLayout] Error (adminError):', adminError);
-                
-                if (adminError && adminError.code !== 'PGRST116') {
-                     console.error("[CompanyLayout] Error REAL al verificar los privilegios de administrador:", adminError);
+                if (adminError) {
+                     console.error("[CompanyLayout] Error al verificar los privilegios de administrador:", adminError);
                 }
 
-                const isAdminResult = !!adminData;
-                console.log(`[CompanyLayout] El resultado de la verificación de administrador (isAdminResult) es: ${isAdminResult}`);
-                setIsAdmin(isAdminResult);
+                setIsAdmin(count !== null && count > 0);
             } else {
-                console.log('[CompanyLayout] No se encontró ningún usuario autenticado. Redirigiendo a /login.');
                 router.push('/login');
             }
+            setIsLoading(false);
         };
 
         checkUserStatus().catch(error => {
             console.error("[CompanyLayout] Ocurrió un error CRÍTICO durante la verificación inicial del usuario:", error);
+            setIsLoading(false); // Make sure loading stops on critical error
             router.push('/login');
-        }).finally(() => {
-            console.log('--- [CompanyLayout] Verificación de estado de usuario finalizada. ---');
-            setIsLoading(false);
         });
 
         const { data: authListener } = supabase.auth.onAuthStateChange(
             (event, session) => {
-                // Listen for sign out events to redirect
                 if (event === 'SIGNED_OUT') {
                     setUser(null);
                     setIsAdmin(false);
                     router.push('/login');
                 } else if (session?.user) {
-                    // Update user state if session changes
                     setUser(session.user);
                 }
             }
@@ -132,7 +114,6 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
     }
 
     if (!user) {
-        // This prevents a flash of the layout before redirecting
         return null;
     }
 
