@@ -61,17 +61,22 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                 }
                 
                 // Check for admin privileges
+                console.log(`CompanyLayout: Checking admin status for user_id: ${user.id}`);
                 const { data: adminData, error: adminError } = await supabase
                     .from('admins')
                     .select('user_id')
                     .eq('user_id', user.id)
                     .single();
+                
+                console.log('CompanyLayout: Admin check query result:', { adminData, adminError });
 
-                if (adminError && adminError.code !== 'PGRST116') {
-                     console.error("CompanyLayout: Error checking for admin:", adminError);
+                if (adminError && adminError.code !== 'PGRST116') { // 'PGRST116' is the code for 'single row not found'
+                     console.error("CompanyLayout: Error checking for admin privilege:", adminError);
                 }
 
-                setIsAdmin(!!adminData);
+                const isAdminResult = !!adminData;
+                console.log(`CompanyLayout: Setting isAdmin state to: ${isAdminResult}`);
+                setIsAdmin(isAdminResult);
                 setUser(user);
             } else {
                 // If no user, redirect to login
