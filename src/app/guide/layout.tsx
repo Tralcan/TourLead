@@ -212,7 +212,7 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
                             <DropdownMenuLabel>{user?.email || "Mi Cuenta"}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={() => router.push('/guide/profile')}>Perfil</DropdownMenuItem>
-                            <DropdownMenuItem>Soporte</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => router.push('/support')}>Soporte</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={handleSignOut}>
                                 <LogOut className="mr-2 h-4 w-4" />
