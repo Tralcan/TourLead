@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
 import { createClient } from '@/lib/supabase/server';
-import { eachDayOfInterval, format, parseISO } from 'date-fns';
+import { eachDayOfInterval, format, parseISO, isBefore, startOfToday } from 'date-fns';
 
 export default async function Home() {
   const supabase = createClient();
+  const today = startOfToday();
 
   // Fetch guides with complete profiles
   const { count: guideCount } = await supabase
@@ -30,15 +31,18 @@ export default async function Home() {
   const { data: availabilityData } = availabilityRes;
   const { data: commitmentsData } = commitmentsRes;
 
-  // Calculate total available days
+  // Calculate total available days, filtering for future dates
   const totalAvailableDays = new Set<string>();
   if (availabilityData) {
     for (const guide of availabilityData) {
         if (guide.availability) {
-            for (const day of guide.availability) {
+            for (const dayString of guide.availability) {
                 try {
-                    // Dates are stored as 'YYYY-MM-DD', parseISO handles this correctly.
-                    totalAvailableDays.add(format(parseISO(day), 'yyyy-MM-dd'));
+                    const day = parseISO(dayString);
+                    // Check if the date is today or in the future
+                    if (!isBefore(day, today)) {
+                        totalAvailableDays.add(format(day, 'yyyy-MM-dd'));
+                    }
                 } catch(e) {
                     // Ignore potential invalid date formats in the DB
                 }
@@ -95,7 +99,7 @@ export default async function Home() {
           </p>
           <div className="mt-6 max-w-3xl mx-auto">
             <p className="text-muted-foreground">
-              Explora una red de <strong className="text-foreground font-semibold">{displayGuideCount.toLocaleString('es-CL')} guías profesionales</strong> con más de <strong className="text-foreground font-semibold">{displayTotalDays.toLocaleString('es-CL')} días de disponibilidad</strong> combinada.
+              Explora una red de <strong className="text-foreground font-semibold">{displayGuideCount.toLocaleString('es-CL')} guías profesionales</strong> con más de <strong className="text-foreground font-semibold">{displayTotalDays.toLocaleString('es-CL')} días de disponibilidad futura</strong> combinada.
             </p>
           </div>
           <div className="mt-8 flex justify-center gap-4">
