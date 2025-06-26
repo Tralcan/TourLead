@@ -1,4 +1,3 @@
-
 "use client"
 import React from 'react';
 import Link from "next/link";
@@ -162,7 +161,7 @@ export default function CommitmentsPage() {
             }
 
             const today = new Date().toISOString().split('T')[0];
-            // Use the new relationship to join offers and get the description directly
+            // Use the explicit hint `!offer_id` to tell Supabase how to join commitments and offers.
             const { data: commitmentsData, error: commitmentsError } = await supabase
                 .from('commitments')
                 .select(`
@@ -173,7 +172,7 @@ export default function CommitmentsPage() {
                     guide_rating,
                     company_rating,
                     company:companies(*),
-                    offer:offers(description)
+                    offer:offers!offer_id(description)
                 `)
                 .eq('guide_id', user.id)
                 .gte('end_date', today)
@@ -196,7 +195,6 @@ export default function CommitmentsPage() {
                         startDate: new Date(c.start_date!.replace(/-/g, '/')),
                         endDate: new Date(c.end_date!.replace(/-/g, '/')),
                         company: { ...company, rating, reviews },
-                        // The 'offer' object with 'description' is now directly available from the query
                     };
                 }));
                 setCommitments(transformedData.filter(Boolean) as unknown as Commitment[]);
