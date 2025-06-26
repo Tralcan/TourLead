@@ -106,6 +106,22 @@ const acceptOfferSchema = z.object({
 export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
     const supabase = createClient();
     
+    // Server-side availability check for overlapping commitments
+    const { data: existingCommitments, error: commitmentError } = await supabase
+        .from('commitments')
+        .select('id')
+        .eq('guide_id', data.guideId)
+        .or(`[start_date,end_date].overlaps.[${data.startDate},${data.endDate}]`);
+
+    if (commitmentError) {
+        console.error("Error checking for commitment conflicts:", commitmentError);
+        return { success: false, message: "Error al verificar tu disponibilidad. Por favor, inténtalo de nuevo." };
+    }
+
+    if (existingCommitments && existingCommitments.length > 0) {
+        return { success: false, message: "No puedes aceptar esta oferta porque ya tienes un compromiso en esas fechas. Por favor, rechaza la oferta." };
+    }
+    
     // 1. Update offer status
     const { error: updateError } = await supabase
         .from('offers')
