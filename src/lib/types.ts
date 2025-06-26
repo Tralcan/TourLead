@@ -24,6 +24,10 @@ export type Company = {
   details: string | null;
   rating?: number; // Calculado
   reviews?: number; // Calculado
+  contact_person?: string | null;
+  phone_landline?: string | null;
+  phone_mobile?: string | null;
+  address?: string | null;
 };
 
 export type JobOffer = {

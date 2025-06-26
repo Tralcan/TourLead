@@ -1,3 +1,4 @@
+
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -26,6 +27,10 @@ const profileFormSchema = z.object({
   email: z.string().email("Por favor, introduce una dirección de correo electrónico válida."),
   specialties: z.string().optional(),
   details: z.string().max(500, "Los detalles no pueden exceder los 500 caracteres.").optional(),
+  contact_person: z.string().optional(),
+  phone_mobile: z.string().optional(),
+  phone_landline: z.string().optional(),
+  address: z.string().optional(),
 })
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
@@ -42,6 +47,10 @@ export default function CompanyProfilePage() {
             email: "",
             specialties: "",
             details: "",
+            contact_person: "",
+            phone_mobile: "",
+            phone_landline: "",
+            address: "",
         },
         mode: "onChange",
     })
@@ -64,8 +73,14 @@ export default function CompanyProfilePage() {
 
             if (data) {
                 form.reset({
-                    ...data,
+                    name: data.name || "",
+                    email: data.email || "",
                     specialties: data.specialties?.join(", ") || "",
+                    details: data.details || "",
+                    contact_person: data.contact_person || "",
+                    phone_mobile: data.phone_mobile || "",
+                    phone_landline: data.phone_landline || "",
+                    address: data.address || "",
                 });
             } else if (error) {
                 console.error(error);
@@ -91,6 +106,10 @@ export default function CompanyProfilePage() {
         email: data.email,
         specialties: data.specialties?.split(',').map(s => s.trim()).filter(Boolean) || [],
         details: data.details,
+        contact_person: data.contact_person,
+        phone_landline: data.phone_landline,
+        phone_mobile: data.phone_mobile,
+        address: data.address,
       })
       .eq('id', user.id)
 
@@ -175,6 +194,64 @@ export default function CompanyProfilePage() {
                 </FormItem>
               )}
             />
+            <div className="border-t pt-8">
+                <h3 className="text-lg font-medium">Información de Contacto Adicional</h3>
+                <p className="text-sm text-muted-foreground mb-6">Esta información será visible para los guías que hayan aceptado tus ofertas.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <FormField
+                      control={form.control}
+                      name="contact_person"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Persona de Contacto</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Juan Pérez" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="phone_mobile"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Teléfono Móvil</FormLabel>
+                          <FormControl>
+                            <Input placeholder="+56 9 1234 5678" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="phone_landline"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Teléfono Fijo</FormLabel>
+                          <FormControl>
+                            <Input placeholder="+56 2 2123 4567" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Dirección Comercial</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Av. Siempre Viva 742, Santiago" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                </div>
+            </div>
             <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">Actualizar Perfil</Button>
           </form>
         </Form>

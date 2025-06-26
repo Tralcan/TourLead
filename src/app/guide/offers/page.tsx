@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { JobOffer, Company } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Check, X, Eye } from "lucide-react";
+import { Check, X, Eye, User as UserIcon, Phone, Smartphone, MapPin } from "lucide-react";
 import { StarRatingDisplay } from "@/components/star-rating";
 import React from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -61,6 +61,34 @@ function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Comp
                              {company.specialties?.length ? company.specialties.map(spec => <Badge key={spec} variant="secondary">{spec}</Badge>) : <p className="text-sm text-muted-foreground">No especificado</p>}
                         </div>
                     </div>
+                     {(company.contact_person || company.phone_mobile || company.phone_landline || company.address) && (
+                        <div className="border-t pt-4 mt-4 space-y-3">
+                            {company.contact_person && (
+                                <div className="flex items-center gap-3">
+                                    <UserIcon className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{company.contact_person}</span>
+                                </div>
+                            )}
+                            {company.phone_mobile && (
+                                <div className="flex items-center gap-3">
+                                    <Smartphone className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{company.phone_mobile}</span>
+                                </div>
+                            )}
+                            {company.phone_landline && (
+                                <div className="flex items-center gap-3">
+                                    <Phone className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{company.phone_landline}</span>
+                                </div>
+                            )}
+                            {company.address && (
+                                <div className="flex items-center gap-3">
+                                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{company.address}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <DialogFooter>
                     <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
