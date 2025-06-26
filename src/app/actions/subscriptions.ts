@@ -1,3 +1,4 @@
+
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
@@ -43,6 +44,7 @@ export async function createSubscription(data: { companyId: string, startDate: D
         company_id: companyId,
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
+        admin_id: user.id, // <-- Aquí se guarda el ID del administrador
     });
 
     if (insertError) {
