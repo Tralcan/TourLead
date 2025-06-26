@@ -109,17 +109,7 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
         return { success: false, message: "No se pudo aceptar la oferta." };
     }
 
-    // 2. Create commitment
-    const { data: offerData, error: offerError } = await supabase
-        .from('offers')
-        .select('description')
-        .eq('id', data.offerId)
-        .single();
-
-    if(offerError) {
-        console.error("Error al obtener descripción de la oferta:", offerError);
-    }
-    
+    // 2. Create commitment, now including the offer_id
     const { error: insertError } = await supabase
         .from('commitments')
         .insert({
@@ -133,6 +123,8 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
     
     if (insertError) {
         console.error("Error al crear compromiso:", insertError);
+        // Rollback offer status if commitment creation fails
+        await supabase.from('offers').update({ status: 'pending' }).eq('id', data.offerId);
         return { success: false, message: "No se pudo crear el compromiso." };
     }
 
