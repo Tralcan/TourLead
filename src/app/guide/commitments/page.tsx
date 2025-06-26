@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format, isPast } from "date-fns";
 import { es } from "date-fns/locale";
-import { History, User as UserIcon, Phone, Smartphone, MapPin } from "lucide-react";
+import { History, User as UserIcon, Phone, Smartphone, MapPin, PhoneCall } from "lucide-react";
 import { RateEntity, StarRatingDisplay } from '@/components/star-rating';
 import { Commitment, Company } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
@@ -131,6 +131,23 @@ function CommitmentDetailsDialog({ commitment, isOpen, onOpenChange }: { commitm
                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{commitment.offer.description}</p>
                         </div>
                     )}
+                     {(commitment.offer?.contact_person || commitment.offer?.contact_phone) && (
+                        <div className="border-t pt-4 space-y-3">
+                            <h4 className="font-semibold text-sm mb-2">Información de Contacto</h4>
+                            {commitment.offer.contact_person && (
+                                <div className="flex items-center gap-3">
+                                    <UserIcon className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{commitment.offer.contact_person}</span>
+                                </div>
+                            )}
+                            {commitment.offer.contact_phone && (
+                                <div className="flex items-center gap-3">
+                                    <PhoneCall className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{commitment.offer.contact_phone}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <DialogFooter>
                     <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
@@ -188,17 +205,21 @@ export default function CommitmentsPage() {
 
             // 2. Fetch related offers
             const offerIds = commitmentsData.map(c => c.offer_id).filter((id): id is number => id !== null);
-            const offersMap = new Map<number, { description: string | null }>();
+            const offersMap = new Map<number, { description: string | null; contact_person: string | null; contact_phone: string | null; }>();
 
             if (offerIds.length > 0) {
                 const { data: offersData, error: offersError } = await supabase
                     .from('offers')
-                    .select('id, description')
+                    .select('id, description, contact_person, contact_phone')
                     .in('id', offerIds);
                 
                 if (offersError) throw offersError;
                 if (offersData) {
-                    offersData.forEach(o => offersMap.set(o.id, { description: o.description }));
+                    offersData.forEach(o => offersMap.set(o.id, { 
+                        description: o.description,
+                        contact_person: o.contact_person,
+                        contact_phone: o.contact_phone
+                     }));
                 }
             }
             
