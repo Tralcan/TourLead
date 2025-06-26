@@ -49,7 +49,7 @@ export async function createSubscription(data: { companyId: string, startDate: D
 
     if (insertError) {
         console.error("Error al crear la suscripción:", insertError);
-        return { success: false, message: 'No se pudo crear la suscripción en la base de datos.' };
+        return { success: false, message: `No se pudo crear la suscripción en la base de datos: ${insertError.message}` };
     }
 
     return { success: true, message: '¡Suscripción creada exitosamente!' };
