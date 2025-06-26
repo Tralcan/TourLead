@@ -319,7 +319,7 @@ export default function CommitmentsPage() {
                             <TableRow key={commitment.id}>
                                 <TableCell>
                                     <div className="font-medium">{commitment.company.name}</div>
-                                    <div className="text-sm text-muted-foreground">{commitment.company.email}</div>
+                                    <div className="text-sm text-muted-foreground">{commitment.offer?.contact_phone || 'Teléfono no disponible'}</div>
                                 </TableCell>
                                 <TableCell>
                                     {format(commitment.startDate, "d MMM, yyyy", { locale: es })} - {format(commitment.endDate, "d MMM, yyyy", { locale: es })}
