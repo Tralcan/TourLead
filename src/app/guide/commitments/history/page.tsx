@@ -19,13 +19,83 @@ import { RateEntity } from "@/components/star-rating";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Download, ArrowLeft } from "lucide-react";
-import { Commitment } from '@/lib/types';
+import { Download, ArrowLeft, User as UserIcon, Phone, Smartphone, MapPin } from "lucide-react";
+import { Company } from '@/lib/types';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-type CommitmentHistory = Omit<Commitment, 'startDate' | 'endDate' | 'id'> & {
+
+type CommitmentHistory = {
     id: number;
+    job_type: string | null;
     start_date: string;
     end_date: string;
+    company_rating: number | null;
+    company: Company;
+}
+
+function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Company, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+    if (!company) return null;
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader className="flex flex-row items-center gap-4">
+                     <Avatar className="h-16 w-16">
+                        <AvatarImage src={company.avatar ?? ''} alt={company.name ?? ''} />
+                        <AvatarFallback>{company.name?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <DialogTitle className="text-2xl">{company.name}</DialogTitle>
+                        <DialogDescription>
+                            {company.email}
+                        </DialogDescription>
+                    </div>
+                </DialogHeader>
+                <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                    {company.details && <p className="text-sm text-muted-foreground">{company.details}</p>}
+                    <div>
+                        <h4 className="font-semibold text-sm mb-2">Especialidades</h4>
+                        <div className="flex flex-wrap gap-2">
+                             {company.specialties?.length ? company.specialties.map(spec => <Badge key={spec} variant="secondary">{spec}</Badge>) : <p className="text-sm text-muted-foreground">No especificado</p>}
+                        </div>
+                    </div>
+                     {(company.contact_person || company.phone_mobile || company.phone_landline || company.address) && (
+                        <div className="border-t pt-4 mt-4 space-y-3">
+                            {company.contact_person && (
+                                <div className="flex items-center gap-3">
+                                    <UserIcon className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{company.contact_person}</span>
+                                </div>
+                            )}
+                            {company.phone_mobile && (
+                                <div className="flex items-center gap-3">
+                                    <Smartphone className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{company.phone_mobile}</span>
+                                </div>
+                            )}
+                            {company.phone_landline && (
+                                <div className="flex items-center gap-3">
+                                    <Phone className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{company.phone_landline}</span>
+                                </div>
+                            )}
+                            {company.address && (
+                                <div className="flex items-center gap-3">
+                                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{company.address}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+                        Cerrar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
 }
 
 export default function CommitmentsHistoryPage() {
@@ -33,6 +103,8 @@ export default function CommitmentsHistoryPage() {
     const supabase = createClient();
     const [history, setHistory] = React.useState<CommitmentHistory[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null);
+    const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false);
 
     const fetchHistory = React.useCallback(async () => {
         setIsLoading(true);
@@ -53,11 +125,7 @@ export default function CommitmentsHistoryPage() {
                     start_date,
                     end_date,
                     company_rating,
-                    company:companies (
-                        id,
-                        name,
-                        email
-                    )
+                    company:companies(*)
                 `)
                 .eq('guide_id', user.id)
                 .lt('end_date', today)
@@ -94,6 +162,11 @@ export default function CommitmentsHistoryPage() {
             toast({ title: "Éxito", description: "Calificación guardada correctamente." });
             fetchHistory();
         }
+    };
+    
+    const handleViewProfile = (company: Company) => {
+        setSelectedCompany(company);
+        setIsProfileDialogOpen(true);
     };
 
     const handleExport = () => {
@@ -140,12 +213,13 @@ export default function CommitmentsHistoryPage() {
                             <TableHead>Fechas</TableHead>
                             <TableHead>Trabajo</TableHead>
                             <TableHead className="text-right">Calificación</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center">Cargando historial...</TableCell>
+                                <TableCell colSpan={5} className="text-center">Cargando historial...</TableCell>
                             </TableRow>
                         ) : history.map(item => (
                             <TableRow key={item.id}>
@@ -164,11 +238,16 @@ export default function CommitmentsHistoryPage() {
                                         onSave={(rating) => handleRateCompany(item.id, rating)}
                                     />
                                 </TableCell>
+                                <TableCell className="text-right">
+                                    <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.company)}>
+                                        Ver Perfil
+                                    </Button>
+                                </TableCell>
                             </TableRow>
                         ))}
                          {!isLoading && history.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                                <TableCell colSpan={5} className="text-center text-muted-foreground">
                                     No tienes trabajos históricos.
                                 </TableCell>
                             </TableRow>
@@ -176,6 +255,13 @@ export default function CommitmentsHistoryPage() {
                     </TableBody>
                 </Table>
             </CardContent>
+            {selectedCompany && (
+                <CompanyProfileDialog
+                    company={selectedCompany}
+                    isOpen={isProfileDialogOpen}
+                    onOpenChange={setIsProfileDialogOpen}
+                />
+            )}
         </Card>
     );
 }
