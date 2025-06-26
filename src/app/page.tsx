@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { ArrowRight, Briefcase, Building, MapPin, Users, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,53 +23,57 @@ export default async function Home() {
     .neq('languages', '{}')
     .gt('rate', 0);
   
-  // Fetch availability with guide IDs, and commitments with guide IDs
-  const [availabilityRes, commitmentsRes] = await Promise.all([
-      supabase.from('guides').select('id, availability'),
-      supabase.from('commitments').select('guide_id, start_date, end_date')
-  ]);
+  // Step 1: Fetch all commitments to build a set of unavailable person-days
+  const { data: commitmentsData } = await supabase
+    .from('commitments')
+    .select('guide_id, start_date, end_date');
 
-  const { data: availabilityData } = availabilityRes;
-  const { data: commitmentsData } = commitmentsRes;
-
-  // Create a set of committed person-days for quick lookup.
-  // Key format: "guideId_YYYY-MM-DD"
+  // Step 2: Create a Set of all committed person-days for fast lookups.
+  // The key is a string: "guideId_YYYY-MM-DD"
   const committedPersonDays = new Set<string>();
   if (commitmentsData) {
       for (const commitment of commitmentsData) {
-          if (!commitment.guide_id) continue;
+          // Skip if data is incomplete
+          if (!commitment.guide_id || !commitment.start_date || !commitment.end_date) continue;
+          
           try {
               const daysInCommitment = eachDayOfInterval({
                   start: parseISO(commitment.start_date),
                   end: parseISO(commitment.end_date)
               });
+
               for (const day of daysInCommitment) {
                   committedPersonDays.add(`${commitment.guide_id}_${format(day, 'yyyy-MM-dd')}`);
               }
           } catch(e) {
-              console.error(`Invalid date range in commitments: ${commitment.start_date} to ${commitment.end_date}`);
+              console.error(`Invalid date range in commitment table: start=${commitment.start_date}, end=${commitment.end_date}`);
           }
       }
   }
 
-  // Calculate total net available person-days
+  // Step 3: Fetch all guides' availability
+  const { data: availabilityData } = await supabase
+    .from('guides')
+    .select('id, availability');
+
+  // Step 4: Calculate total net available person-days
   let netAvailablePersonDays = 0;
   if (availabilityData) {
     for (const guide of availabilityData) {
-        if (guide.availability) {
+        if (guide.availability && Array.isArray(guide.availability)) {
             for (const dayString of guide.availability) {
                 try {
                     const day = parseISO(dayString);
                     // Check 1: Is the day today or in the future?
                     if (!isBefore(day, today)) {
                         const formattedDay = format(day, 'yyyy-MM-dd');
-                        // Check 2: Is this guide committed on this day?
+                        // Check 2: Is this specific guide committed on this specific day?
                         if (!committedPersonDays.has(`${guide.id}_${formattedDay}`)) {
                             netAvailablePersonDays++;
                         }
                     }
                 } catch(e) {
-                    // Ignore potential invalid date formats in the DB
+                    // Ignore potential invalid date formats in the DB array.
                 }
             }
         }
