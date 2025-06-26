@@ -26,60 +26,76 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
     const [user, setUser] = React.useState<User | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [isAdmin, setIsAdmin] = React.useState(false);
-    const [navItems, setNavItems] = React.useState(baseNavItems);
+
+    const navItems = React.useMemo(() => {
+        return isAdmin ? [...baseNavItems, adminNavItem] : baseNavItems;
+    }, [isAdmin]);
 
     React.useEffect(() => {
-        const { data: authListener } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                try {
-                    if (session) {
-                        const { data: companyProfile, error: selectError } = await supabase
-                            .from('companies')
-                            .select('id')
-                            .eq('id', session.user.id)
-                            .single();
-                        
-                        if(selectError && selectError.code !== 'PGRST116') { // PGRST116: "exact one row not found" which is fine
-                            console.error("CompanyLayout: Error checking for profile:", selectError);
-                            throw selectError;
-                        }
+        const checkUserStatus = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (user) {
+                // Ensure company profile exists, or create one
+                const { data: companyProfile, error: selectError } = await supabase
+                    .from('companies')
+                    .select('id')
+                    .eq('id', user.id)
+                    .single();
+                
+                if(selectError && selectError.code !== 'PGRST116') {
+                    console.error("CompanyLayout: Error checking for profile:", selectError);
+                    throw selectError;
+                }
 
-                        if (!companyProfile) {
-                           const { error: insertError } = await supabase.from('companies').insert({
-                                id: session.user.id,
-                                email: session.user.email,
-                                name: session.user.user_metadata?.full_name || 'Nueva Empresa',
-                            });
-                            if (insertError) {
-                                console.error("CompanyLayout: Error creating new profile:", insertError);
-                                throw insertError;
-                            }
-                        }
-                        
-                        const { data: adminData, error: adminError } = await supabase
-                            .from('admins')
-                            .select('user_id')
-                            .eq('user_id', session.user.id)
-                            .single();
-
-                        if (adminError && adminError.code !== 'PGRST116') {
-                             console.error("CompanyLayout: Error checking for admin:", adminError);
-                        }
-
-                        const userIsAdmin = !!adminData;
-                        setIsAdmin(userIsAdmin);
-                        setNavItems(userIsAdmin ? [...baseNavItems, adminNavItem] : baseNavItems);
-
-                        setUser(session.user);
-
-                    } else {
-                        router.push('/login');
+                if (!companyProfile) {
+                   const { error: insertError } = await supabase.from('companies').insert({
+                        id: user.id,
+                        email: user.email,
+                        name: user.user_metadata?.full_name || 'Nueva Empresa',
+                    });
+                    if (insertError) {
+                        console.error("CompanyLayout: Error creating new profile:", insertError);
+                        throw insertError;
                     }
-                } catch(error) {
-                    console.error("CompanyLayout: An error occurred in onAuthStateChange logic:", error);
+                }
+                
+                // Check for admin privileges
+                const { data: adminData, error: adminError } = await supabase
+                    .from('admins')
+                    .select('user_id')
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (adminError && adminError.code !== 'PGRST116') {
+                     console.error("CompanyLayout: Error checking for admin:", adminError);
+                }
+
+                setIsAdmin(!!adminData);
+                setUser(user);
+            } else {
+                // If no user, redirect to login
+                router.push('/login');
+            }
+        };
+
+        checkUserStatus().catch(error => {
+            console.error("CompanyLayout: An error occurred during initial user check:", error);
+            router.push('/login');
+        }).finally(() => {
+            setIsLoading(false);
+        });
+
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+            (event, session) => {
+                // Listen for sign out events to redirect
+                if (event === 'SIGNED_OUT') {
+                    setUser(null);
+                    setIsAdmin(false);
                     router.push('/login');
-                } finally {
-                    setIsLoading(false);
+                } else if (session?.user) {
+                    // Update user state if session changes
+                    setUser(session.user);
                 }
             }
         );
@@ -103,6 +119,7 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
     }
 
     if (!user) {
+        // This prevents a flash of the layout before redirecting
         return null;
     }
 
