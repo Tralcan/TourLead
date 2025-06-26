@@ -163,7 +163,7 @@ export default function HiredHistoryPage() {
                                         </Avatar>
                                         <div>
                                             <div className="font-medium">{item.guide.name}</div>
-                                            <div className="text-sm text-muted-foreground">{item.guide.email}</div>
+                                            <div className="text-sm text-muted-foreground">{item.guide.phone || 'Teléfono no proporcionado'}</div>
                                         </div>
                                     </div>
                                 </TableCell>
