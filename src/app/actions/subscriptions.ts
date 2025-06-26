@@ -52,10 +52,6 @@ export async function createSubscription(data: { companyId: string, startDate: D
     return { success: true, message: '¡Suscripción creada exitosamente!' };
 }
 
-const cancelSubscriptionSchema = z.object({
-    subscriptionId: z.coerce.number(),
-});
-
 export async function cancelSubscription(formData: FormData) {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -63,7 +59,7 @@ export async function cancelSubscription(formData: FormData) {
     if (!user) {
         return { success: false, message: 'Autenticación requerida.' };
     }
-
+    
     const { data: adminData, error: adminError } = await supabase
         .from('admins')
         .select('user_id')
@@ -75,15 +71,19 @@ export async function cancelSubscription(formData: FormData) {
         return { success: false, message: 'No tienes permisos para realizar esta acción.' };
     }
     
-    const rawData = Object.fromEntries(formData.entries());
-    
-    const parsed = cancelSubscriptionSchema.safeParse(rawData);
+    const subscriptionIdFromForm = formData.get('subscriptionId');
 
-    if (!parsed.success) {
-        return { success: false, message: `Datos inválidos: ${parsed.error.errors.map(e => e.message).join(', ')}` };
+    if (subscriptionIdFromForm === null || subscriptionIdFromForm === undefined) {
+         return { success: false, message: "ID de suscripción no proporcionado." };
     }
     
-    const { subscriptionId } = parsed.data;
+    const parsedId = Number(subscriptionIdFromForm);
+    
+    if (isNaN(parsedId)) {
+        return { success: false, message: `El valor proporcionado '${subscriptionIdFromForm}' no es un número válido.` };
+    }
+
+    const subscriptionId = parsedId;
     const today = new Date().toISOString();
 
     const { error: updateError } = await supabase.from('subscriptions').update({
