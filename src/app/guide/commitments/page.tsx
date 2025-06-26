@@ -172,7 +172,7 @@ export default function CommitmentsPage() {
                     end_date,
                     guide_rating,
                     company_rating,
-                    company:companies(*)
+                    company(*)
                 `)
                 .eq('guide_id', user.id)
                 .gte('end_date', today)
