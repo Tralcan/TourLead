@@ -2,7 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Building2, Search, Users, PanelLeft, UserCircle, Mountain, LogOut } from 'lucide-react';
+import { Building2, Search, Users, PanelLeft, UserCircle, Mountain, LogOut, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -12,6 +12,7 @@ import type { User } from '@supabase/supabase-js';
 const navItems = [
     { href: '/company/hired', icon: Users, label: 'Guías Contratados' },
     { href: '/company/search', icon: Search, label: 'Buscar Guías' },
+    { href: '/company/reputation', icon: Star, label: 'Reputación' },
     { href: '/company/profile', icon: Building2, label: 'Perfil de la Empresa' },
 ];
 
