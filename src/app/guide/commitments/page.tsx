@@ -1,3 +1,4 @@
+
 "use client"
 import React from 'react';
 import Link from "next/link";
@@ -154,14 +155,14 @@ export default function CommitmentsPage() {
         setIsLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
-
             if (!user) {
                 setIsLoading(false);
                 return;
             }
 
             const today = new Date().toISOString().split('T')[0];
-            // Use the explicit hint `!offer_id` to tell Supabase how to join commitments and offers.
+
+            // 1. Fetch commitments
             const { data: commitmentsData, error: commitmentsError } = await supabase
                 .from('commitments')
                 .select(`
@@ -171,34 +172,57 @@ export default function CommitmentsPage() {
                     end_date,
                     guide_rating,
                     company_rating,
-                    company:companies(*),
-                    offer:offers!offer_id(description)
+                    offer_id,
+                    company:companies(*)
                 `)
                 .eq('guide_id', user.id)
                 .gte('end_date', today)
                 .order('start_date', { ascending: true });
-            
-            if (commitmentsError) throw commitmentsError;
-            
-            if (commitmentsData) {
-                const transformedData = await Promise.all(commitmentsData.map(async (c) => {
-                    if (!c.company) {
-                        console.warn(`El compromiso con id ${c.id} no tiene una empresa asociada o no se pudo cargar.`);
-                        return null;
-                    }
-                    
-                    const company = c.company as Company;
-                    const { rating, reviews } = await getCompanyRating(company.id);
 
-                    return {
-                        ...c,
-                        startDate: new Date(c.start_date!.replace(/-/g, '/')),
-                        endDate: new Date(c.end_date!.replace(/-/g, '/')),
-                        company: { ...company, rating, reviews },
-                    };
-                }));
-                setCommitments(transformedData.filter(Boolean) as unknown as Commitment[]);
+            if (commitmentsError) throw commitmentsError;
+            if (!commitmentsData) {
+                setCommitments([]);
+                setIsLoading(false);
+                return;
             }
+
+            // 2. Fetch related offers
+            const offerIds = commitmentsData.map(c => c.offer_id).filter((id): id is number => id !== null);
+            const offersMap = new Map<number, { description: string | null }>();
+
+            if (offerIds.length > 0) {
+                const { data: offersData, error: offersError } = await supabase
+                    .from('offers')
+                    .select('id, description')
+                    .in('id', offerIds);
+                
+                if (offersError) throw offersError;
+                if (offersData) {
+                    offersData.forEach(o => offersMap.set(o.id, { description: o.description }));
+                }
+            }
+            
+            // 3. Combine data
+            const transformedData = await Promise.all(commitmentsData.map(async (c) => {
+                if (!c.company) {
+                    console.warn(`El compromiso con id ${c.id} no tiene una empresa asociada o no se pudo cargar.`);
+                    return null;
+                }
+                
+                const company = c.company as Company;
+                const { rating, reviews } = await getCompanyRating(company.id);
+                const offerDetails = c.offer_id ? offersMap.get(c.offer_id) : null;
+
+                return {
+                    ...c,
+                    startDate: new Date(c.start_date!.replace(/-/g, '/')),
+                    endDate: new Date(c.end_date!.replace(/-/g, '/')),
+                    company: { ...company, rating, reviews },
+                    offer: offerDetails,
+                };
+            }));
+            setCommitments(transformedData.filter(Boolean) as unknown as Commitment[]);
+
         } catch (error) {
             console.error("Error al cargar compromisos:", error);
             const errorMessage = error instanceof Error ? error.message : "Error desconocido";
