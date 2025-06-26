@@ -2,15 +2,7 @@
 "use client";
 
 import React from "react";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { StarRatingDisplay } from "@/components/star-rating";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -212,70 +204,55 @@ export default function ReputationPage() {
                 <CardHeader>
                     <CardTitle>Evaluaciones Recibidas</CardTitle>
                     <CardDescription>
-                        Aquí solo se muestran las evaluaciones de las empresas a las que tú también has calificado. Para ver una evaluación, asegúrate de calificar a la empresa en la sección de 'Mis Compromisos'.
+                        Aquí solo se muestran las evaluaciones de las empresas a las que tú también has calificado. Para ver una evaluación, asegúrate de calificar a la empresa en la sección de 'Historial'.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Empresa</TableHead>
-                                <TableHead>Trabajo</TableHead>
-                                <TableHead>Fecha</TableHead>
-                                <TableHead className="text-right">Calificación Recibida</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {isLoading ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center">Cargando evaluaciones...</TableCell>
-                                </TableRow>
-                            ) : reputationData.length > 0 ? (
-                                reputationData.map((item, index) => (
-                                <React.Fragment key={index}>
-                                    <TableRow>
-                                        <TableCell className="font-medium">
-                                            {item.company?.name || 'Empresa Desconocida'}
-                                        </TableCell>
-                                        <TableCell>{item.job_type || 'No especificado'}</TableCell>
-                                        <TableCell>
-                                            {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex justify-end">
-                                                <StarRatingDisplay rating={item.guide_rating!} />
+                    {isLoading ? (
+                         <p className="text-center text-muted-foreground py-8">Cargando evaluaciones...</p>
+                    ) : reputationData.length > 0 ? (
+                        <div className="space-y-4">
+                        {reputationData.map((item, index) => (
+                            <Card key={index}>
+                                <CardHeader className="pb-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                                        <div className="flex items-center gap-3">
+                                            <UserIcon className="h-5 w-5 text-muted-foreground" />
+                                            <div>
+                                                <CardTitle className="text-base">{item.company?.name || 'Empresa Desconocida'}</CardTitle>
+                                                <CardDescription>
+                                                    {item.job_type || 'No especificado'} • {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
+                                                </CardDescription>
                                             </div>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {item.company && (
-                                                <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.company!)}>
-                                                    Ver Perfil
-                                                </Button>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
+                                        </div>
+                                        <div className="flex-shrink-0">
+                                            <StarRatingDisplay rating={item.guide_rating!} />
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
                                     {item.guide_rating_comment && (
-                                        <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                            <TableCell colSpan={5} className="py-2 px-6">
-                                                <div className="flex items-start gap-2">
-                                                   <MessageSquare className="h-4 w-4 mt-1 text-muted-foreground flex-shrink-0" />
-                                                   <p className="text-sm text-muted-foreground italic">{item.guide_rating_comment}</p>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
+                                        <blockquote className="border-l-2 pl-4 italic text-muted-foreground">
+                                            <MessageSquare className="inline-block h-4 w-4 mr-2 -mt-1" />
+                                            {item.guide_rating_comment}
+                                        </blockquote>
                                     )}
-                                </React.Fragment>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                                        No tienes evaluaciones visibles. Califica a una empresa para ver su evaluación.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                                </CardContent>
+                                {item.company && (
+                                    <CardFooter>
+                                        <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.company!)} className="w-full sm:w-auto">
+                                            Ver Perfil de {item.company.name}
+                                        </Button>
+                                    </CardFooter>
+                                )}
+                            </Card>
+                        ))}
+                        </div>
+                    ) : (
+                        <p className="text-center text-muted-foreground py-8">
+                            No tienes evaluaciones visibles. Califica a una empresa para ver su evaluación.
+                        </p>
+                    )}
                 </CardContent>
             </Card>
 

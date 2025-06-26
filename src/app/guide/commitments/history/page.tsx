@@ -11,7 +11,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -215,14 +215,98 @@ export default function CommitmentsHistoryPage() {
         XLSX.writeFile(workbook, "historial_compromisos.xlsx");
     };
 
+    const renderContent = () => {
+        if (isLoading) {
+            return <p className="text-center text-muted-foreground py-8">Cargando historial...</p>;
+        }
+
+        if (history.length === 0) {
+            return <p className="text-center text-muted-foreground py-8">No tienes trabajos históricos.</p>;
+        }
+
+        return (
+            <>
+                {/* Mobile View */}
+                <div className="md:hidden space-y-4">
+                    {history.map(item => (
+                        <Card key={item.id}>
+                            <CardHeader>
+                                <CardTitle className="text-base">{item.company.name}</CardTitle>
+                                <CardDescription>{item.company.email}</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2 text-sm">
+                                <div><Badge variant="secondary" className="w-full justify-center">{item.job_type}</Badge></div>
+                                <div>
+                                    <span className="font-semibold">Fechas: </span>
+                                    {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
+                                </div>
+                            </CardContent>
+                            <CardFooter className="flex-col items-center gap-4">
+                                <RateEntity
+                                    entityName={item.company.name ?? 'Empresa'}
+                                    currentRating={item.company_rating ?? undefined}
+                                    onSave={(rating, comment) => handleRateCompany(item.id, rating, comment)}
+                                />
+                                <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.company)} className="w-full">
+                                    Ver Perfil de Empresa
+                                </Button>
+                            </CardFooter>
+                        </Card>
+                    ))}
+                </div>
+
+                {/* Desktop View */}
+                <div className="hidden md:block">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Empresa</TableHead>
+                                <TableHead>Fechas</TableHead>
+                                <TableHead>Trabajo</TableHead>
+                                <TableHead className="text-right">Calificación</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {history.map(item => (
+                                <TableRow key={item.id}>
+                                    <TableCell>
+                                        <div className="font-medium">{item.company.name}</div>
+                                        <div className="text-sm text-muted-foreground">{item.company.email}</div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
+                                    </TableCell>
+                                    <TableCell><Badge variant="secondary">{item.job_type}</Badge></TableCell>
+                                    <TableCell className="text-right">
+                                        <RateEntity
+                                            entityName={item.company.name ?? 'Empresa'}
+                                            currentRating={item.company_rating ?? undefined}
+                                            onSave={(rating, comment) => handleRateCompany(item.id, rating, comment)}
+                                        />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.company)}>
+                                            Ver Perfil
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </>
+        );
+    };
+
     return (
         <Card>
-            <CardHeader className="flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <CardTitle>Historial de Compromisos</CardTitle>
                     <CardDescription>Revisa y califica tus trabajos pasados.</CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto pt-4 sm:pt-0">
                     <Button variant="outline" asChild>
                         <Link href="/guide/commitments">
                             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -231,59 +315,12 @@ export default function CommitmentsHistoryPage() {
                     </Button>
                     <Button onClick={handleExport} disabled={history.length === 0}>
                         <Download className="mr-2 h-4 w-4" />
-                        Exportar a Excel
+                        Exportar
                     </Button>
                 </div>
             </CardHeader>
             <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Empresa</TableHead>
-                            <TableHead>Fechas</TableHead>
-                            <TableHead>Trabajo</TableHead>
-                            <TableHead className="text-right">Calificación</TableHead>
-                            <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {isLoading ? (
-                            <TableRow>
-                                <TableCell colSpan={5} className="text-center">Cargando historial...</TableCell>
-                            </TableRow>
-                        ) : history.map(item => (
-                            <TableRow key={item.id}>
-                                <TableCell>
-                                    <div className="font-medium">{item.company.name}</div>
-                                    <div className="text-sm text-muted-foreground">{item.company.email}</div>
-                                </TableCell>
-                                <TableCell>
-                                    {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
-                                </TableCell>
-                                <TableCell><Badge variant="secondary">{item.job_type}</Badge></TableCell>
-                                <TableCell className="text-right">
-                                    <RateEntity
-                                        entityName={item.company.name ?? 'Empresa'}
-                                        currentRating={item.company_rating ?? undefined}
-                                        onSave={(rating, comment) => handleRateCompany(item.id, rating, comment)}
-                                    />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.company)}>
-                                        Ver Perfil
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                         {!isLoading && history.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={5} className="text-center text-muted-foreground">
-                                    No tienes trabajos históricos.
-                                </TableCell>
-                            </TableRow>
-                         )}
-                    </TableBody>
-                </Table>
+                {renderContent()}
             </CardContent>
             {selectedCompany && (
                 <CompanyProfileDialog

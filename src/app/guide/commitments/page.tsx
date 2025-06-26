@@ -10,7 +10,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format, isPast } from "date-fns";
@@ -285,82 +285,131 @@ export default function CommitmentsPage() {
         setIsDetailsDialogOpen(true);
     };
 
+    const renderContent = () => {
+        if (isLoading) {
+            return <p className="text-center text-muted-foreground py-8">Cargando...</p>;
+        }
+
+        if (commitments.length === 0) {
+            return <p className="text-center text-muted-foreground py-8">No tienes compromisos próximos.</p>;
+        }
+
+        return (
+            <>
+                {/* Mobile View */}
+                <div className="md:hidden space-y-4">
+                    {commitments.map((commitment) => (
+                        <Card key={commitment.id}>
+                            <CardHeader>
+                                <CardTitle className="text-base">{commitment.company.name}</CardTitle>
+                                <CardDescription>{commitment.offer?.contact_phone || 'Teléfono no disponible'}</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2 text-sm">
+                                <button onClick={() => handleViewDetails(commitment)} className="w-full p-0 m-0 border-0 bg-transparent text-left cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
+                                    <Badge variant="default" className="w-full justify-center bg-primary/20 text-primary-foreground hover:bg-primary/30 pointer-events-none">{commitment.job_type}</Badge>
+                                </button>
+                                <div>
+                                    <span className="font-semibold">Fechas: </span>
+                                    {format(commitment.startDate, "d MMM, yyyy", { locale: es })} - {format(commitment.endDate, "d MMM, yyyy", { locale: es })}
+                                </div>
+                                <div>
+                                    <span className="font-semibold">Estado: </span>
+                                     {isPast(commitment.endDate) ? (
+                                        <Badge variant="outline">Finalizado</Badge>
+                                    ) : (
+                                        <Badge variant="outline">Próximo</Badge>
+                                    )}
+                                </div>
+                            </CardContent>
+                            <CardFooter className="flex-col items-center gap-2">
+                                {isPast(commitment.endDate) && (
+                                    <RateEntity 
+                                        entityName={commitment.company.name} 
+                                        currentRating={commitment.company_rating ?? undefined}
+                                        onSave={(rating) => handleRateCompany(commitment.id, rating)}
+                                    />
+                                )}
+                                <Button variant="outline" size="sm" onClick={() => handleViewProfile(commitment.company as Company)} className="w-full">
+                                    Ver Perfil de Empresa
+                                </Button>
+                            </CardFooter>
+                        </Card>
+                    ))}
+                </div>
+
+                {/* Desktop View */}
+                <div className="hidden md:block">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Empresa</TableHead>
+                                <TableHead>Fechas</TableHead>
+                                <TableHead>Trabajo</TableHead>
+                                <TableHead>Estado</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {commitments.map((commitment) => (
+                                <TableRow key={commitment.id}>
+                                    <TableCell>
+                                        <div className="font-medium">{commitment.company.name}</div>
+                                        <div className="text-sm text-muted-foreground">{commitment.offer?.contact_phone || 'Teléfono no disponible'}</div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {format(commitment.startDate, "d MMM, yyyy", { locale: es })} - {format(commitment.endDate, "d MMM, yyyy", { locale: es })}
+                                    </TableCell>
+                                    <TableCell>
+                                        <button onClick={() => handleViewDetails(commitment)} className="p-0 m-0 border-0 bg-transparent text-left cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
+                                            <Badge variant="default" className="bg-primary/20 text-primary-foreground hover:bg-primary/30 pointer-events-none">{commitment.job_type}</Badge>
+                                        </button>
+                                    </TableCell>
+                                    <TableCell>
+                                        {isPast(commitment.endDate) ? (
+                                            <Badge variant="outline">Finalizado</Badge>
+                                        ) : (
+                                            <Badge variant="outline">Próximo</Badge>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            {isPast(commitment.endDate) ? (
+                                                <RateEntity 
+                                                    entityName={commitment.company.name} 
+                                                    currentRating={commitment.company_rating ?? undefined}
+                                                    onSave={(rating) => handleRateCompany(commitment.id, rating)}
+                                                />
+                                            ) : null}
+                                            <Button variant="outline" size="sm" onClick={() => handleViewProfile(commitment.company as Company)}>
+                                                Ver Perfil
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </>
+        );
+    };
+
     return (
         <Card>
-            <CardHeader className="flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <CardTitle>Mis Compromisos Próximos</CardTitle>
                     <CardDescription>Una lista de todos tus trabajos programados y futuros.</CardDescription>
                 </div>
                  <Link href="/guide/commitments/history" passHref>
-                    <Button variant="outline">
+                    <Button variant="outline" className="mt-4 sm:mt-0 w-full sm:w-auto">
                         <History className="mr-2 h-4 w-4" />
                         Ver Historial
                     </Button>
                 </Link>
             </CardHeader>
             <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Empresa</TableHead>
-                            <TableHead>Fechas</TableHead>
-                            <TableHead>Trabajo</TableHead>
-                            <TableHead>Estado</TableHead>
-                            <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {isLoading ? (
-                            <TableRow>
-                                <TableCell colSpan={5} className="text-center">Cargando...</TableCell>
-                            </TableRow>
-                        ) : commitments.map((commitment) => (
-                            <TableRow key={commitment.id}>
-                                <TableCell>
-                                    <div className="font-medium">{commitment.company.name}</div>
-                                    <div className="text-sm text-muted-foreground">{commitment.offer?.contact_phone || 'Teléfono no disponible'}</div>
-                                </TableCell>
-                                <TableCell>
-                                    {format(commitment.startDate, "d MMM, yyyy", { locale: es })} - {format(commitment.endDate, "d MMM, yyyy", { locale: es })}
-                                </TableCell>
-                                <TableCell>
-                                    <button onClick={() => handleViewDetails(commitment)} className="p-0 m-0 border-0 bg-transparent text-left cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
-                                        <Badge variant="default" className="bg-primary/20 text-primary-foreground hover:bg-primary/30 pointer-events-none">{commitment.job_type}</Badge>
-                                    </button>
-                                </TableCell>
-                                <TableCell>
-                                    {isPast(commitment.endDate) ? (
-                                        <Badge variant="outline">Finalizado</Badge>
-                                    ) : (
-                                        <Badge variant="outline">Próximo</Badge>
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        {isPast(commitment.endDate) ? (
-                                            <RateEntity 
-                                                entityName={commitment.company.name} 
-                                                currentRating={commitment.company_rating ?? undefined}
-                                                onSave={(rating) => handleRateCompany(commitment.id, rating)}
-                                            />
-                                        ) : null}
-                                        <Button variant="outline" size="sm" onClick={() => handleViewProfile(commitment.company as Company)}>
-                                            Ver Perfil
-                                        </Button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                         {!isLoading && commitments.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={5} className="text-center text-muted-foreground">
-                                    No tienes compromisos próximos.
-                                </TableCell>
-                            </TableRow>
-                         )}
-                    </TableBody>
-                </Table>
+                {renderContent()}
             </CardContent>
             {selectedCommitment && <CommitmentDetailsDialog commitment={selectedCommitment} isOpen={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen} />}
             {selectedCompany && <CompanyProfileDialog company={selectedCompany} isOpen={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen} />}

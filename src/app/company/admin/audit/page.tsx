@@ -10,7 +10,7 @@ import { ArrowLeft, Loader2, Download } from "lucide-react";
 import * as XLSX from 'xlsx';
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
@@ -100,8 +100,8 @@ export default function AuditPage() {
                 const log = subscriptionsData.map(sub => ({
                     ...sub,
                     companyName: companiesMap.get(sub.company_id) || 'Empresa Desconocida',
-                    adminName: companiesMap.get(sub.admin_id) || 'Admin Desconocido',
-                    cancelingAdminName: sub.canceled_by_admin_id ? (companiesMap.get(sub.canceled_by_admin_id) || 'Admin Desconocido') : null,
+                    adminName: 'Admin',
+                    cancelingAdminName: sub.canceled_by_admin_id ? 'Admin' : null,
                 }));
                 setAuditLog(log as SubscriptionRecord[]);
             }
@@ -182,21 +182,21 @@ export default function AuditPage() {
         <>
             <Card>
                 <CardHeader>
-                    <div className="flex-row items-center justify-between sm:flex">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <CardTitle>Auditoría de Suscripciones</CardTitle>
                             <CardDescription>Un historial de todas las suscripciones creadas en la plataforma.</CardDescription>
                         </div>
-                        <Button variant="outline" asChild className="mt-4 sm:mt-0">
+                        <Button variant="outline" asChild className="mt-4 sm:mt-0 w-full sm:w-auto">
                             <Link href="/company/admin">
                                 <ArrowLeft className="mr-2 h-4 w-4" />
                                 Volver
                             </Link>
                         </Button>
                     </div>
-                    <div className="flex items-center gap-4 pt-4 border-t mt-4">
+                    <div className="flex flex-col sm:flex-row items-center gap-2 pt-4 border-t mt-4">
                         <Select onValueChange={setSelectedCompany} value={selectedCompany}>
-                            <SelectTrigger className="w-full sm:w-[250px]">
+                            <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Filtrar por empresa" />
                             </SelectTrigger>
                             <SelectContent>
@@ -206,36 +206,30 @@ export default function AuditPage() {
                                 ))}
                             </SelectContent>
                         </Select>
-                        <Button onClick={handleExport} disabled={filteredAuditLog.length === 0}>
+                        <Button onClick={handleExport} disabled={filteredAuditLog.length === 0} className="w-full sm:w-auto">
                             <Download className="mr-2 h-4 w-4" />
                             Exportar a Excel
                         </Button>
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Empresa Suscrita</TableHead>
-                                <TableHead>Periodo</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead>Información</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredAuditLog.length > 0 ? (
-                                filteredAuditLog.map(log => {
-                                    const isCancelled = !!log.canceled_by_admin_id;
-                                    const isActive = !isPast(new Date(log.end_date.replace(/-/g, '/')));
-                                    
-                                    return (
-                                        <TableRow key={log.id} className={isCancelled ? 'bg-destructive/10 hover:bg-destructive/20' : ''}>
-                                            <TableCell className="font-medium">{log.companyName}</TableCell>
-                                            <TableCell>
+                    {/* Mobile View */}
+                    <div className="md:hidden space-y-4">
+                        {filteredAuditLog.length > 0 ? (
+                            filteredAuditLog.map(log => {
+                                const isCancelled = !!log.canceled_by_admin_id;
+                                const isActive = !isPast(new Date(log.end_date.replace(/-/g, '/')));
+                                return (
+                                    <Card key={log.id} className={isCancelled ? 'bg-destructive/10' : ''}>
+                                        <CardHeader>
+                                            <CardTitle className="text-base">{log.companyName}</CardTitle>
+                                            <CardDescription>
                                                 {format(new Date(log.start_date.replace(/-/g, '/')), "d MMM yyyy", { locale: es })} - {format(new Date(log.end_date.replace(/-/g, '/')), "d MMM yyyy", { locale: es })}
-                                            </TableCell>
-                                            <TableCell>
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2 text-sm">
+                                            <div>
+                                                <span className="font-semibold">Estado: </span>
                                                 {isCancelled ? (
                                                     <Badge variant="destructive">Cancelada</Badge>
                                                 ) : isActive ? (
@@ -243,32 +237,88 @@ export default function AuditPage() {
                                                 ) : (
                                                     <Badge variant="outline">Expirada</Badge>
                                                 )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div>Creada por: {log.adminName}</div>
-                                                {isCancelled && log.cancelingAdminName && (
-                                                    <div className="text-xs text-muted-foreground">Cancelada por: {log.cancelingAdminName}</div>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {!isCancelled && isActive && (
-                                                    <Button variant="destructive" size="sm" onClick={() => handleOpenCancelDialog(log)}>
-                                                        Cancelar
-                                                    </Button>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    )
-                                })
-                            ) : (
+                                            </div>
+                                            <div><span className="font-semibold">Creada por:</span> {log.adminName}</div>
+                                            {isCancelled && log.cancelingAdminName && (
+                                                <div className="text-xs text-muted-foreground">Cancelada por: {log.cancelingAdminName}</div>
+                                            )}
+                                        </CardContent>
+                                        <CardFooter>
+                                            {!isCancelled && isActive && (
+                                                <Button variant="destructive" size="sm" onClick={() => handleOpenCancelDialog(log)} className="w-full">
+                                                    Cancelar Suscripción
+                                                </Button>
+                                            )}
+                                        </CardFooter>
+                                    </Card>
+                                )
+                            })
+                        ) : (
+                            <p className="text-center text-muted-foreground py-4">
+                                No hay registros de suscripción para el filtro seleccionado.
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Desktop View */}
+                    <div className="hidden md:block">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                                        No hay registros de suscripción para el filtro seleccionado.
-                                    </TableCell>
+                                    <TableHead>Empresa Suscrita</TableHead>
+                                    <TableHead>Periodo</TableHead>
+                                    <TableHead>Estado</TableHead>
+                                    <TableHead>Información</TableHead>
+                                    <TableHead className="text-right">Acciones</TableHead>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredAuditLog.length > 0 ? (
+                                    filteredAuditLog.map(log => {
+                                        const isCancelled = !!log.canceled_by_admin_id;
+                                        const isActive = !isPast(new Date(log.end_date.replace(/-/g, '/')));
+                                        
+                                        return (
+                                            <TableRow key={log.id} className={isCancelled ? 'bg-destructive/10 hover:bg-destructive/20' : ''}>
+                                                <TableCell className="font-medium">{log.companyName}</TableCell>
+                                                <TableCell>
+                                                    {format(new Date(log.start_date.replace(/-/g, '/')), "d MMM yyyy", { locale: es })} - {format(new Date(log.end_date.replace(/-/g, '/')), "d MMM yyyy", { locale: es })}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {isCancelled ? (
+                                                        <Badge variant="destructive">Cancelada</Badge>
+                                                    ) : isActive ? (
+                                                        <Badge variant="default" className="bg-green-600 hover:bg-green-700">Activa</Badge>
+                                                    ) : (
+                                                        <Badge variant="outline">Expirada</Badge>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div>Creada por: {log.adminName}</div>
+                                                    {isCancelled && log.cancelingAdminName && (
+                                                        <div className="text-xs text-muted-foreground">Cancelada por: {log.cancelingAdminName}</div>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {!isCancelled && isActive && (
+                                                        <Button variant="destructive" size="sm" onClick={() => handleOpenCancelDialog(log)}>
+                                                            Cancelar
+                                                        </Button>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        )
+                                    })
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center text-muted-foreground">
+                                            No hay registros de suscripción para el filtro seleccionado.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
             

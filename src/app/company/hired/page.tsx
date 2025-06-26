@@ -10,7 +10,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
@@ -207,6 +207,111 @@ export default function HiredGuidesPage() {
         setIsProfileDialogOpen(true);
     };
 
+    const renderContent = () => {
+        if (isLoading) {
+            return <p className="text-center text-muted-foreground py-8">Cargando...</p>;
+        }
+
+        if (guidesList.length === 0) {
+            return (
+                <p className="text-center text-muted-foreground py-8">
+                    No tienes ofertas pendientes ni guías contratados para fechas futuras.
+                </p>
+            );
+        }
+
+        return (
+            <>
+                {/* Mobile View */}
+                <div className="md:hidden space-y-4">
+                    {guidesList.map(item => (
+                        <Card key={`${item.status}-${item.id}`}>
+                             <CardHeader className="flex flex-row items-center gap-4">
+                                <Avatar className="w-12 h-12">
+                                    <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
+                                    <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <CardTitle className="text-base">{item.guide.name}</CardTitle>
+                                    <CardDescription>
+                                        {item.status === 'Aceptado' && item.guide.phone ? item.guide.phone : 'Contacto no disponible'}
+                                    </CardDescription>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-2 text-sm">
+                                <div>
+                                    <span className="font-semibold">Trabajo: </span> {item.job_type}
+                                </div>
+                                <div>
+                                    <span className="font-semibold">Fechas: </span> 
+                                    {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
+                                </div>
+                                <div>
+                                    <span className="font-semibold">Estado: </span>
+                                    <Badge variant={item.status === 'Aceptado' ? 'default' : 'outline'}>{item.status}</Badge>
+                                </div>
+                            </CardContent>
+                             {item.status === 'Aceptado' && (
+                                <CardFooter>
+                                    <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)} className="w-full">
+                                        Ver Perfil
+                                    </Button>
+                                </CardFooter>
+                            )}
+                        </Card>
+                    ))}
+                </div>
+
+                {/* Desktop View */}
+                <div className="hidden md:block">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Guía</TableHead>
+                                <TableHead>Fechas</TableHead>
+                                <TableHead>Trabajo</TableHead>
+                                <TableHead>Estado</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {guidesList.map(item => (
+                                <TableRow key={`${item.status}-${item.id}`}>
+                                    <TableCell>
+                                        <div className="flex items-center gap-4">
+                                            <Avatar>
+                                                <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
+                                                <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <div className="font-medium">{item.guide.name}</div>
+                                                {item.status === 'Aceptado' && item.guide.phone && (
+                                                    <div className="text-sm text-muted-foreground">{item.guide.phone}</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
+                                    </TableCell>
+                                    <TableCell>{item.job_type}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={item.status === 'Aceptado' ? 'default' : 'outline'}>{item.status}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {item.status === 'Aceptado' && (
+                                            <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)}>Ver Perfil</Button>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </>
+        );
+    };
+
     return (
         <Card>
             <CardHeader className="flex-row items-center justify-between">
@@ -222,60 +327,7 @@ export default function HiredGuidesPage() {
                 </Link>
             </CardHeader>
             <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Guía</TableHead>
-                            <TableHead>Fechas</TableHead>
-                            <TableHead>Trabajo</TableHead>
-                            <TableHead>Estado</TableHead>
-                            <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {isLoading ? (
-                            <TableRow>
-                                <TableCell colSpan={5} className="text-center">Cargando...</TableCell>
-                            </TableRow>
-                        ) : guidesList.map(item => (
-                            <TableRow key={`${item.status}-${item.id}`}>
-                                <TableCell>
-                                    <div className="flex items-center gap-4">
-                                        <Avatar>
-                                            <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
-                                            <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
-                                        </Avatar>
-                                        <div>
-                                            <div className="font-medium">{item.guide.name}</div>
-                                            {item.status === 'Aceptado' && item.guide.phone && (
-                                                <div className="text-sm text-muted-foreground">{item.guide.phone}</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
-                                </TableCell>
-                                <TableCell>{item.job_type}</TableCell>
-                                <TableCell>
-                                    <Badge variant={item.status === 'Aceptado' ? 'default' : 'outline'}>{item.status}</Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    {item.status === 'Aceptado' && (
-                                        <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)}>Ver Perfil</Button>
-                                    )}
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                         {!isLoading && guidesList.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={5} className="text-center text-muted-foreground">
-                                    No tienes ofertas pendientes ni guías contratados para fechas futuras.
-                                </TableCell>
-                            </TableRow>
-                         )}
-                    </TableBody>
-                </Table>
+                {renderContent()}
             </CardContent>
             {selectedGuide && <GuideProfileDialog guide={selectedGuide} isOpen={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen} />}
         </Card>

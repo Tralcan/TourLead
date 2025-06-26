@@ -11,7 +11,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
@@ -117,15 +117,104 @@ export default function HiredHistoryPage() {
         XLSX.utils.book_append_sheet(workbook, worksheet, "Historial");
         XLSX.writeFile(workbook, "historial_guias_contratados.xlsx");
     };
+    
+    const renderContent = () => {
+        if (isLoading) {
+            return <p className="text-center text-muted-foreground py-8">Cargando historial...</p>;
+        }
+
+        if (history.length === 0) {
+            return <p className="text-center text-muted-foreground py-8">No tienes trabajos históricos.</p>;
+        }
+
+        return (
+            <>
+                {/* Mobile View */}
+                <div className="md:hidden space-y-4">
+                    {history.map(item => (
+                        <Card key={item.id}>
+                            <CardHeader className="flex flex-row items-center gap-4">
+                                <Avatar className="w-12 h-12">
+                                    <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
+                                    <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <CardTitle className="text-base">{item.guide.name}</CardTitle>
+                                    <CardDescription>{item.guide.phone || 'Teléfono no proporcionado'}</CardDescription>
+                                </div>
+                            </CardHeader>
+                             <CardContent className="space-y-2 text-sm">
+                                <div><Badge variant="secondary" className="w-full justify-center">{item.job_type}</Badge></div>
+                                <div>
+                                    <span className="font-semibold">Fechas: </span>
+                                    {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
+                                </div>
+                            </CardContent>
+                            <CardFooter className="flex-col items-center gap-2">
+                                <RateEntity
+                                    entityName={item.guide.name ?? 'Guía'}
+                                    currentRating={item.guide_rating ?? undefined}
+                                    onSave={(rating, comment) => handleRateGuide(item.id, rating, comment)}
+                                />
+                            </CardFooter>
+                        </Card>
+                    ))}
+                </div>
+
+                {/* Desktop View */}
+                <div className="hidden md:block">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Guía</TableHead>
+                                <TableHead>Fechas</TableHead>
+                                <TableHead>Trabajo</TableHead>
+                                <TableHead className="text-right">Calificación</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {history.map(item => (
+                                <TableRow key={item.id}>
+                                    <TableCell>
+                                        <div className="flex items-center gap-4">
+                                            <Avatar>
+                                                <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
+                                                <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <div className="font-medium">{item.guide.name}</div>
+                                                <div className="text-sm text-muted-foreground">{item.guide.phone || 'Teléfono no proporcionado'}</div>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
+                                    </TableCell>
+                                    <TableCell><Badge variant="secondary">{item.job_type}</Badge></TableCell>
+                                    <TableCell className="text-right">
+                                        <RateEntity
+                                            entityName={item.guide.name ?? 'Guía'}
+                                            currentRating={item.guide_rating ?? undefined}
+                                            onSave={(rating, comment) => handleRateGuide(item.id, rating, comment)}
+                                        />
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </>
+        );
+    };
 
     return (
         <Card>
-            <CardHeader className="flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <CardTitle>Historial de Guías Contratados</CardTitle>
                     <CardDescription>Revisa y califica los trabajos pasados.</CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto pt-4 sm:pt-0">
                     <Button variant="outline" asChild>
                         <Link href="/company/hired">
                             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -134,61 +223,12 @@ export default function HiredHistoryPage() {
                     </Button>
                     <Button onClick={handleExport} disabled={history.length === 0}>
                         <Download className="mr-2 h-4 w-4" />
-                        Exportar a Excel
+                        Exportar
                     </Button>
                 </div>
             </CardHeader>
             <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Guía</TableHead>
-                            <TableHead>Fechas</TableHead>
-                            <TableHead>Trabajo</TableHead>
-                            <TableHead className="text-right">Calificación</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {isLoading ? (
-                            <TableRow>
-                                <TableCell colSpan={4} className="text-center">Cargando historial...</TableCell>
-                            </TableRow>
-                        ) : history.map(item => (
-                            <TableRow key={item.id}>
-                                <TableCell>
-                                    <div className="flex items-center gap-4">
-                                        <Avatar>
-                                            <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
-                                            <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
-                                        </Avatar>
-                                        <div>
-                                            <div className="font-medium">{item.guide.name}</div>
-                                            <div className="text-sm text-muted-foreground">{item.guide.phone || 'Teléfono no proporcionado'}</div>
-                                        </div>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
-                                </TableCell>
-                                <TableCell><Badge variant="secondary">{item.job_type}</Badge></TableCell>
-                                <TableCell className="text-right">
-                                    <RateEntity
-                                        entityName={item.guide.name ?? 'Guía'}
-                                        currentRating={item.guide_rating ?? undefined}
-                                        onSave={(rating, comment) => handleRateGuide(item.id, rating, comment)}
-                                    />
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                         {!isLoading && history.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={4} className="text-center text-muted-foreground">
-                                    No tienes trabajos históricos.
-                                </TableCell>
-                            </TableRow>
-                         )}
-                    </TableBody>
-                </Table>
+                {renderContent()}
             </CardContent>
         </Card>
     );
