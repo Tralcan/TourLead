@@ -1,5 +1,7 @@
 
-import Link from 'next/link';
+'use client';
+
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ArrowLeft } from 'lucide-react';
@@ -7,15 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/logo';
 
 export default function SupportPage() {
+  const router = useRouter();
+
   return (
     <div className="flex flex-col min-h-screen bg-muted/40">
         <header className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <Logo />
-             <Button variant="outline" asChild>
-                <Link href="/">
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Volver a la página principal
-                </Link>
+             <Button variant="outline" onClick={() => router.back()}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Volver
             </Button>
         </header>
 
