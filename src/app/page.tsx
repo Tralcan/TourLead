@@ -4,27 +4,74 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
 import { createClient } from '@/lib/supabase/server';
+import { eachDayOfInterval, format, parseISO } from 'date-fns';
 
 export default async function Home() {
   const supabase = createClient();
 
+  // Fetch guides with complete profiles
   const { count: guideCount } = await supabase
     .from('guides')
-    .select('id', { count: 'exact', head: true });
-
-  const { data: availabilityData } = await supabase
-    .from('guides')
-    .select('availability');
+    .select('id', { count: 'exact', head: true })
+    .not('summary', 'is', null)
+    .neq('summary', '')
+    .not('specialties', 'is', null)
+    .neq('specialties', '{}')
+    .not('languages', 'is', null)
+    .neq('languages', '{}')
+    .gt('rate', 0);
   
-  let totalDays = 0;
+  // Fetch all availability and commitments to calculate net available days
+  const [availabilityRes, commitmentsRes] = await Promise.all([
+      supabase.from('guides').select('availability'),
+      supabase.from('commitments').select('start_date, end_date')
+  ]);
+
+  const { data: availabilityData } = availabilityRes;
+  const { data: commitmentsData } = commitmentsRes;
+
+  // Calculate total available days
+  const totalAvailableDays = new Set<string>();
   if (availabilityData) {
-    totalDays = availabilityData.reduce((acc, guide) => {
-      return acc + (guide.availability?.length || 0);
-    }, 0);
+    for (const guide of availabilityData) {
+        if (guide.availability) {
+            for (const day of guide.availability) {
+                try {
+                    // Dates are stored as 'YYYY-MM-DD', parseISO handles this correctly.
+                    totalAvailableDays.add(format(parseISO(day), 'yyyy-MM-dd'));
+                } catch(e) {
+                    // Ignore potential invalid date formats in the DB
+                }
+            }
+        }
+    }
   }
+
+  // Calculate total committed days
+  const committedDays = new Set<string>();
+  if (commitmentsData) {
+      for (const commitment of commitmentsData) {
+          try {
+              const daysInCommitment = eachDayOfInterval({
+                  start: parseISO(commitment.start_date),
+                  end: parseISO(commitment.end_date)
+              });
+              for (const day of daysInCommitment) {
+                  committedDays.add(format(day, 'yyyy-MM-dd'));
+              }
+          } catch(e) {
+              console.error(`Invalid date range in commitments: ${commitment.start_date} to ${commitment.end_date}`);
+          }
+      }
+  }
+
+  // Subtract committed days from the total available set to get the net availability
+  committedDays.forEach(day => {
+      totalAvailableDays.delete(day);
+  });
   
   const displayGuideCount = guideCount ?? 0;
-  const displayTotalDays = totalDays;
+  const displayTotalDays = totalAvailableDays.size;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
