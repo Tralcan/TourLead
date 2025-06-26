@@ -22,8 +22,8 @@ export type Company = {
   avatar: string | null;
   specialties: string[] | null;
   details: string | null;
-  rating: number; // Calculado
-  reviews: number; // Calculado
+  rating?: number; // Calculado
+  reviews?: number; // Calculado
 };
 
 export type JobOffer = {

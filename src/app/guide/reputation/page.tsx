@@ -15,12 +15,54 @@ import { StarRatingDisplay } from "@/components/star-rating";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Star, UserCheck } from "lucide-react";
+import type { Company } from "@/lib/types";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 type ReputationData = {
     job_type: string | null;
     guide_rating: number | null;
-    company: { name: string | null } | null;
+    company: Company | null;
 };
+
+
+function CompanyProfileDialog({ company, isOpen, onOpenChange }: { company: Company, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+    if (!company) return null;
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader className="flex flex-row items-center gap-4">
+                     <Avatar className="h-16 w-16">
+                        <AvatarImage src={company.avatar ?? ''} alt={company.name ?? ''} />
+                        <AvatarFallback>{company.name?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <DialogTitle className="text-2xl">{company.name}</DialogTitle>
+                        <DialogDescription>
+                            {company.email}
+                        </DialogDescription>
+                    </div>
+                </DialogHeader>
+                <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                    {company.details && <p className="text-sm text-muted-foreground">{company.details}</p>}
+                    <div>
+                        <h4 className="font-semibold text-sm mb-2">Especialidades</h4>
+                        <div className="flex flex-wrap gap-2">
+                             {company.specialties?.length ? company.specialties.map(spec => <Badge key={spec} variant="secondary">{spec}</Badge>) : <p className="text-sm text-muted-foreground">No especificado</p>}
+                        </div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+                        Cerrar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
 
 export default function ReputationPage() {
     const { toast } = useToast();
@@ -29,6 +71,8 @@ export default function ReputationPage() {
     const [averageRating, setAverageRating] = React.useState(0);
     const [totalReviews, setTotalReviews] = React.useState(0);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null);
+    const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false);
 
     React.useEffect(() => {
         const fetchReputation = async () => {
@@ -43,7 +87,7 @@ export default function ReputationPage() {
             try {
                 const { data, error } = await supabase
                     .from('commitments')
-                    .select('job_type, guide_rating, company_rating, company:companies(name)')
+                    .select('job_type, guide_rating, company_rating, company:companies(*)')
                     .eq('guide_id', user.id)
                     .not('guide_rating', 'is', null);
 
@@ -56,7 +100,7 @@ export default function ReputationPage() {
                     setAverageRating(avgRating);
                     setTotalReviews(ratedCommitments.length);
 
-                    const displayableData = data.filter(c => c.guide_rating !== null && c.company_rating !== null);
+                    const displayableData = data.filter(c => c.guide_rating !== null && c.company_rating !== null && c.company);
                     setReputationData(displayableData as ReputationData[]);
                 }
             } catch (error) {
@@ -70,6 +114,11 @@ export default function ReputationPage() {
 
         fetchReputation();
     }, [supabase, toast]);
+
+    const handleViewProfile = (company: Company) => {
+        setSelectedCompany(company);
+        setIsProfileDialogOpen(true);
+    };
 
     return (
         <div className="space-y-6">
@@ -123,7 +172,18 @@ export default function ReputationPage() {
                             ) : reputationData.length > 0 ? (
                                 reputationData.map((item, index) => (
                                 <TableRow key={index}>
-                                    <TableCell className="font-medium">{item.company?.name || 'Empresa Desconocida'}</TableCell>
+                                    <TableCell className="font-medium">
+                                        {item.company ? (
+                                            <button
+                                                onClick={() => handleViewProfile(item.company!)}
+                                                className="text-left font-medium text-primary hover:underline"
+                                            >
+                                                {item.company.name || 'Empresa Desconocida'}
+                                            </button>
+                                        ) : (
+                                            'Empresa Desconocida'
+                                        )}
+                                    </TableCell>
                                     <TableCell>{item.job_type || 'No especificado'}</TableCell>
                                     <TableCell>
                                         <div className="flex justify-end">
@@ -143,6 +203,14 @@ export default function ReputationPage() {
                     </Table>
                 </CardContent>
             </Card>
+
+            {selectedCompany && (
+                <CompanyProfileDialog
+                    company={selectedCompany}
+                    isOpen={isProfileDialogOpen}
+                    onOpenChange={setIsProfileDialogOpen}
+                />
+            )}
         </div>
     );
 }
