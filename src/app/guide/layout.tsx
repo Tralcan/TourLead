@@ -8,6 +8,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { createClient } from '@/lib/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Logo } from "@/components/logo";
 
 const navItems = [
     { href: '/guide/commitments', icon: CalendarCheck, label: 'Mis Compromisos' },
@@ -109,6 +111,42 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
     if (!user) {
         return null;
     }
+    
+    const MobileNav = (
+        <Sheet>
+            <SheetTrigger asChild>
+                <Button size="icon" variant="outline" className="sm:hidden">
+                    <PanelLeft className="h-5 w-5" />
+                    <span className="sr-only">Alternar Menú</span>
+                </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="sm:max-w-xs">
+                <nav className="grid gap-6 text-lg font-medium">
+                    <Logo />
+                    {navItems.map((item) => (
+                        <Link
+                            key={item.href}
+                            href={item.href}
+                            className={`flex items-center gap-4 px-2.5 ${
+                                pathname.startsWith(item.href)
+                                    ? 'text-foreground'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            <item.icon className="h-5 w-5" />
+                            {item.label}
+                            {item.label === 'Ofertas de Trabajo' && pendingOffersCount > 0 && (
+                                <span className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-xs text-white">
+                                    {pendingOffersCount}
+                                </span>
+                            )}
+                        </Link>
+                    ))}
+                </nav>
+            </SheetContent>
+        </Sheet>
+    );
+
 
     return (
       <TooltipProvider>
@@ -152,12 +190,9 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
             </aside>
             <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
                 <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-                    <Button size="icon" variant="outline" className="sm:hidden">
-                        <PanelLeft className="h-5 w-5" />
-                        <span className="sr-only">Alternar Menú</span>
-                    </Button>
+                    {MobileNav}
                     <div className="flex-1">
-                        <h1 className="font-headline text-lg font-semibold">
+                        <h1 className="font-headline text-lg font-semibold hidden sm:block">
                             {navItems.find(item => pathname.startsWith(item.href))?.label || 'Panel'}
                         </h1>
                     </div>
