@@ -175,10 +175,15 @@ export default function CommitmentsHistoryPage() {
         fetchHistory();
     }, [fetchHistory]);
     
-    const handleRateCompany = async (commitmentId: number, rating: number) => {
+    const handleRateCompany = async (commitmentId: number, rating: number, comment: string) => {
+        const updateData: { company_rating: number, company_rating_comment?: string } = { company_rating: rating };
+        if (comment) {
+            updateData.company_rating_comment = comment;
+        }
+
         const { error } = await supabase
             .from('commitments')
-            .update({ company_rating: rating })
+            .update(updateData)
             .eq('id', commitmentId);
 
         if (error) {
@@ -260,7 +265,7 @@ export default function CommitmentsHistoryPage() {
                                     <RateEntity
                                         entityName={item.company.name ?? 'Empresa'}
                                         currentRating={item.company_rating ?? undefined}
-                                        onSave={(rating) => handleRateCompany(item.id, rating)}
+                                        onSave={(rating, comment) => handleRateCompany(item.id, rating, comment)}
                                     />
                                 </TableCell>
                                 <TableCell className="text-right">

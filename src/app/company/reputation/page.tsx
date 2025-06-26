@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { StarRatingDisplay } from "@/components/star-rating";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Star, UserCheck } from "lucide-react";
+import { Star, UserCheck, MessageSquare } from "lucide-react";
 import type { Guide } from "@/lib/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -49,6 +49,7 @@ async function getGuideRating(guideId: string) {
 type ReputationData = {
     job_type: string | null;
     company_rating: number | null;
+    company_rating_comment: string | null;
     guide: Guide | null;
     end_date: string;
 };
@@ -124,7 +125,7 @@ export default function ReputationPage() {
             try {
                 const { data, error } = await supabase
                     .from('commitments')
-                    .select('job_type, company_rating, guide_rating, end_date, guide:guides(*)')
+                    .select('job_type, company_rating, company_rating_comment, guide_rating, end_date, guide:guides(*)')
                     .eq('company_id', user.id)
                     .not('company_rating', 'is', null)
                     .order('end_date', { ascending: false });
@@ -219,27 +220,39 @@ export default function ReputationPage() {
                                 </TableRow>
                             ) : reputationData.length > 0 ? (
                                 reputationData.map((item, index) => (
-                                <TableRow key={index}>
-                                    <TableCell className="font-medium">
-                                        {item.guide?.name || 'Guía Desconocido'}
-                                    </TableCell>
-                                    <TableCell>{item.job_type || 'No especificado'}</TableCell>
-                                    <TableCell>
-                                        {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex justify-end">
-                                            <StarRatingDisplay rating={item.company_rating!} />
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {item.guide && (
-                                            <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide!)}>
-                                                Ver Perfil
-                                            </Button>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
+                                <React.Fragment key={index}>
+                                    <TableRow>
+                                        <TableCell className="font-medium">
+                                            {item.guide?.name || 'Guía Desconocido'}
+                                        </TableCell>
+                                        <TableCell>{item.job_type || 'No especificado'}</TableCell>
+                                        <TableCell>
+                                            {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex justify-end">
+                                                <StarRatingDisplay rating={item.company_rating!} />
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {item.guide && (
+                                                <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide!)}>
+                                                    Ver Perfil
+                                                </Button>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                    {item.company_rating_comment && (
+                                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                            <TableCell colSpan={5} className="py-2 px-6">
+                                                <div className="flex items-start gap-2">
+                                                    <MessageSquare className="h-4 w-4 mt-1 text-muted-foreground flex-shrink-0" />
+                                                    <p className="text-sm text-muted-foreground italic">{item.company_rating_comment}</p>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </React.Fragment>
                                 ))
                             ) : (
                                 <TableRow>

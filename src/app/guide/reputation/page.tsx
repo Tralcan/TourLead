@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { StarRatingDisplay } from "@/components/star-rating";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Star, UserCheck, User as UserIcon, Phone, Smartphone, MapPin } from "lucide-react";
+import { Star, UserCheck, User as UserIcon, Phone, Smartphone, MapPin, MessageSquare } from "lucide-react";
 import type { Company } from "@/lib/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -45,6 +45,7 @@ async function getCompanyRating(companyId: string) {
 type ReputationData = {
     job_type: string | null;
     guide_rating: number | null;
+    guide_rating_comment: string | null;
     company: Company | null;
     end_date: string;
 };
@@ -137,7 +138,7 @@ export default function ReputationPage() {
             try {
                 const { data, error } = await supabase
                     .from('commitments')
-                    .select('job_type, guide_rating, company_rating, end_date, company:companies(*)')
+                    .select('job_type, guide_rating, guide_rating_comment, company_rating, end_date, company:companies(*)')
                     .eq('guide_id', user.id)
                     .not('guide_rating', 'is', null)
                     .order('end_date', { ascending: false });
@@ -232,27 +233,39 @@ export default function ReputationPage() {
                                 </TableRow>
                             ) : reputationData.length > 0 ? (
                                 reputationData.map((item, index) => (
-                                <TableRow key={index}>
-                                    <TableCell className="font-medium">
-                                        {item.company?.name || 'Empresa Desconocida'}
-                                    </TableCell>
-                                    <TableCell>{item.job_type || 'No especificado'}</TableCell>
-                                    <TableCell>
-                                        {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex justify-end">
-                                            <StarRatingDisplay rating={item.guide_rating!} />
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {item.company && (
-                                            <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.company!)}>
-                                                Ver Perfil
-                                            </Button>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
+                                <React.Fragment key={index}>
+                                    <TableRow>
+                                        <TableCell className="font-medium">
+                                            {item.company?.name || 'Empresa Desconocida'}
+                                        </TableCell>
+                                        <TableCell>{item.job_type || 'No especificado'}</TableCell>
+                                        <TableCell>
+                                            {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex justify-end">
+                                                <StarRatingDisplay rating={item.guide_rating!} />
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {item.company && (
+                                                <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.company!)}>
+                                                    Ver Perfil
+                                                </Button>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                    {item.guide_rating_comment && (
+                                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                            <TableCell colSpan={5} className="py-2 px-6">
+                                                <div className="flex items-start gap-2">
+                                                   <MessageSquare className="h-4 w-4 mt-1 text-muted-foreground flex-shrink-0" />
+                                                   <p className="text-sm text-muted-foreground italic">{item.guide_rating_comment}</p>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </React.Fragment>
                                 ))
                             ) : (
                                 <TableRow>

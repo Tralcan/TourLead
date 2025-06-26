@@ -82,10 +82,15 @@ export default function HiredHistoryPage() {
         fetchHistory();
     }, [fetchHistory]);
 
-    const handleRateGuide = async (commitmentId: string, rating: number) => {
+    const handleRateGuide = async (commitmentId: string, rating: number, comment: string) => {
+        const updateData: { guide_rating: number, guide_rating_comment?: string } = { guide_rating: rating };
+        if (comment) {
+            updateData.guide_rating_comment = comment;
+        }
+
         const { error } = await supabase
             .from('commitments')
-            .update({ guide_rating: rating })
+            .update(updateData)
             .eq('id', commitmentId);
 
         if (error) {
@@ -170,7 +175,7 @@ export default function HiredHistoryPage() {
                                     <RateEntity
                                         entityName={item.guide.name ?? 'Guía'}
                                         currentRating={item.guide_rating ?? undefined}
-                                        onSave={(rating) => handleRateGuide(item.id, rating)}
+                                        onSave={(rating, comment) => handleRateGuide(item.id, rating, comment)}
                                     />
                                 </TableCell>
                             </TableRow>
