@@ -360,6 +360,9 @@ export default function SearchGuidesPage() {
     const [languagesList, setLanguagesList] = React.useState<string[]>([]);
     const [hasSearched, setHasSearched] = React.useState(false);
 
+    const [isSubscribed, setIsSubscribed] = React.useState(false);
+    const [isCheckingSubscription, setIsCheckingSubscription] = React.useState(true);
+
     const [selectedGuide, setSelectedGuide] = React.useState<Guide | null>(null);
     const [isOfferDialogOpen, setIsOfferDialogOpen] = React.useState(false);
     
@@ -370,49 +373,74 @@ export default function SearchGuidesPage() {
     const [isRatingDialogOpen, setIsRatingDialogOpen] = React.useState(false);
 
     React.useEffect(() => {
-        async function fetchData() {
-            setIsLoading(true);
-            try {
-                const [guidesRes, specialtiesRes, languagesRes] = await Promise.all([
-                    supabase.from('guides').select('*'),
-                    supabase.from('expertise').select('name').eq('state', true),
-                    supabase.from('languaje').select('name')
-                ]);
+        async function performSubscriptionCheckAndFetchData() {
+            setIsCheckingSubscription(true);
+            const { data: { user } } = await supabase.auth.getUser();
 
-                const { data: guidesData, error: guidesError } = guidesRes;
-                if (guidesError) throw new Error(`Error fetching guides: ${guidesError.message}`);
-
-                if (guidesData) {
-                    const guidesWithRatings = await Promise.all(
-                        guidesData.map(async (guide) => {
-                            const { rating, reviews } = await getGuideRating(guide.id);
-                            return { ...guide, rating, reviews } as Guide;
-                        })
-                    );
-                    setAllGuides(guidesWithRatings);
-                }
-
-                const { data: specialtiesData, error: specialtiesError } = specialtiesRes;
-                if (specialtiesError) throw new Error(`Error fetching specialties: ${specialtiesError.message}`);
-                if (specialtiesData) {
-                    setSpecialtiesList(specialtiesData.map(s => s.name).filter(Boolean));
-                }
-
-                const { data: languagesData, error: languagesError } = languagesRes;
-                if (languagesError) throw new Error(`Error fetching languages: ${languagesError.message}`);
-                if (languagesData) {
-                    setLanguagesList(languagesData.map(l => l.name).filter(Boolean));
-                }
-
-                setFilteredGuides([]);
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : "Un error desconocido ocurrió.";
-                toast({ title: "Error", description: `Ocurrió un error inesperado al cargar los datos de búsqueda: ${errorMessage}`, variant: "destructive" });
-            } finally {
+            if (!user) {
+                setIsCheckingSubscription(false);
                 setIsLoading(false);
+                return;
+            }
+
+            try {
+                const today = new Date().toISOString();
+                const { data: subscriptionData, error: subscriptionError } = await supabase
+                    .from('subscriptions')
+                    .select('id', { count: 'exact' })
+                    .eq('company_id', user.id)
+                    .lte('start_date', today)
+                    .gte('end_date', today);
+
+                if (subscriptionError) throw subscriptionError;
+
+                if (subscriptionData && subscriptionData.length > 0) {
+                    setIsSubscribed(true);
+                    setIsLoading(true);
+                    
+                    const [guidesRes, specialtiesRes, languagesRes] = await Promise.all([
+                        supabase.from('guides').select('*'),
+                        supabase.from('expertise').select('name').eq('state', true),
+                        supabase.from('languaje').select('name')
+                    ]);
+
+                    const { data: guidesData, error: guidesError } = guidesRes;
+                    if (guidesError) throw new Error(`Error fetching guides: ${guidesError.message}`);
+                    if (guidesData) {
+                         const guidesWithRatings = await Promise.all(
+                            guidesData.map(async (guide) => {
+                                const { rating, reviews } = await getGuideRating(guide.id);
+                                return { ...guide, rating, reviews } as Guide;
+                            })
+                        );
+                        setAllGuides(guidesWithRatings);
+                    }
+
+                    const { data: specialtiesData, error: specialtiesError } = specialtiesRes;
+                    if (specialtiesError) throw new Error(`Error fetching specialties: ${specialtiesError.message}`);
+                    if (specialtiesData) {
+                        setSpecialtiesList(specialtiesData.map(s => s.name).filter(Boolean));
+                    }
+
+                    const { data: languagesData, error: languagesError } = languagesRes;
+                    if (languagesError) throw new Error(`Error fetching languages: ${languagesError.message}`);
+                    if (languagesData) {
+                        setLanguagesList(languagesData.map(l => l.name).filter(Boolean));
+                    }
+                    setFilteredGuides([]);
+                    setIsLoading(false);
+                } else {
+                    setIsSubscribed(false);
+                }
+            } catch (error) {
+                 const errorMessage = error instanceof Error ? error.message : "Un error desconocido ocurrió.";
+                toast({ title: "Error", description: `Ocurrió un error inesperado: ${errorMessage}`, variant: "destructive" });
+                 setIsLoading(false);
+            } finally {
+                setIsCheckingSubscription(false);
             }
         }
-        fetchData();
+        performSubscriptionCheckAndFetchData();
     }, [toast]);
 
     const handleSearch = () => {
@@ -475,6 +503,33 @@ export default function SearchGuidesPage() {
             setIsRatingDialogOpen(true);
         }
     };
+
+    if (isCheckingSubscription) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Verificando Acceso</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p>Estamos verificando tu estado de suscripción...</p>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!isSubscribed) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Acceso Restringido</CardTitle>
+                    <CardDescription>Necesitas una suscripción activa para buscar guías.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p>Por favor, contacta con el administrador para activar tu acceso a esta funcionalidad.</p>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -646,3 +701,5 @@ export default function SearchGuidesPage() {
         </div>
     );
 }
+
+    
