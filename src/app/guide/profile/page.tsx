@@ -34,6 +34,9 @@ const profileFormSchema = z.object({
   languages: z.array(z.string()).optional(),
   rate: z.coerce.number().min(0, "La tarifa debe ser un número positivo.").optional(),
   avatar: z.any().optional(),
+  career: z.string().optional(),
+  institution: z.string().optional(),
+  is_certified: z.boolean().default(false).optional(),
 })
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
@@ -59,6 +62,9 @@ export default function GuideProfilePage() {
         specialties: [],
         languages: [],
         rate: 0,
+        career: "",
+        institution: "",
+        is_certified: false,
       },
       mode: "onChange",
     });
@@ -92,6 +98,9 @@ export default function GuideProfilePage() {
                 rate: guideData.rate || 0,
                 specialties: guideData.specialties || [],
                 languages: guideData.languages || [],
+                career: guideData.career || "",
+                institution: guideData.institution || "",
+                is_certified: guideData.is_certified || false,
               });
               setAvatarUrl(guideData.avatar);
               setAvatarPreview(guideData.avatar);
@@ -172,7 +181,10 @@ export default function GuideProfilePage() {
         specialties: data.specialties,
         languages: data.languages,
         rate: data.rate,
-        avatar: newAvatarUrl
+        avatar: newAvatarUrl,
+        career: data.career,
+        institution: data.institution,
+        is_certified: data.is_certified,
       })
       .eq("id", user.id);
     
@@ -286,6 +298,60 @@ export default function GuideProfilePage() {
                 </FormItem>
               )}
             />
+
+            <div className="border-t pt-8">
+                <h3 className="text-lg font-medium">Información Académica</h3>
+                <p className="text-sm text-muted-foreground mb-6">Esta información puede ayudar a las empresas a conocer mejor tu formación.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <FormField
+                      control={form.control}
+                      name="career"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Carrera</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ej. Turismo Aventura" {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="institution"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Universidad o Instituto</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ej. Instituto Profesional..." {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                </div>
+                <div className="mt-8">
+                    <FormField
+                      control={form.control}
+                      name="is_certified"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Estoy titulado
+                            </FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                </div>
+            </div>
             
             <FormField
               control={form.control}

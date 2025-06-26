@@ -13,6 +13,9 @@ export type Guide = {
   reviews: number; // Calculado
   availability: string[]; // Fechas en formato ISO string
   commitments?: Commitment[];
+  career?: string | null;
+  institution?: string | null;
+  is_certified?: boolean | null;
 };
 
 export type Company = {
