@@ -32,9 +32,15 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
 
     React.useEffect(() => {
         const checkUserStatus = async () => {
+            console.log('--- [CompanyLayout] Iniciando verificación de estado de usuario ---');
+            setIsLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
             
             if (user) {
+                console.log('[CompanyLayout] Usuario autenticado encontrado:', user);
+                console.log('[CompanyLayout] ID de usuario para la verificación:', user.id);
+                setUser(user);
+
                 // Ensure company profile exists, or create one
                 const { data: companyProfile, error: selectError } = await supabase
                     .from('companies')
@@ -43,46 +49,53 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                     .single();
                 
                 if(selectError && selectError.code !== 'PGRST116') {
-                    console.error("Error al verificar el perfil de la empresa:", selectError);
-                    throw selectError;
+                    console.error("[CompanyLayout] Error al verificar el perfil de la empresa:", selectError);
                 }
 
                 if (!companyProfile) {
+                   console.log('[CompanyLayout] Perfil de empresa no encontrado, creando uno nuevo...');
                    const { error: insertError } = await supabase.from('companies').insert({
                         id: user.id,
                         email: user.email,
                         name: user.user_metadata?.full_name || 'Nueva Empresa',
                     });
                     if (insertError) {
-                        console.error("Error al crear un nuevo perfil de empresa:", insertError);
-                        throw insertError;
+                        console.error("[CompanyLayout] Error al crear un nuevo perfil de empresa:", insertError);
+                    } else {
+                        console.log('[CompanyLayout] Perfil de empresa creado exitosamente.');
                     }
                 }
                 
                 // Check for admin privileges
+                console.log(`[CompanyLayout] >>> Realizando consulta a la tabla 'admins' con user_id: ${user.id}`);
                 const { data: adminData, error: adminError } = await supabase
                     .from('admins')
                     .select('user_id')
                     .eq('user_id', user.id)
                     .single();
                 
-                if (adminError && adminError.code !== 'PGRST116') { // 'PGRST116' is the code for 'single row not found'
-                     console.error("Error al verificar los privilegios de administrador:", adminError);
+                console.log('[CompanyLayout] <<< Resultado de la consulta a "admins":');
+                console.log('[CompanyLayout] Datos (adminData):', adminData);
+                console.log('[CompanyLayout] Error (adminError):', adminError);
+                
+                if (adminError && adminError.code !== 'PGRST116') {
+                     console.error("[CompanyLayout] Error REAL al verificar los privilegios de administrador:", adminError);
                 }
 
                 const isAdminResult = !!adminData;
+                console.log(`[CompanyLayout] El resultado de la verificación de administrador (isAdminResult) es: ${isAdminResult}`);
                 setIsAdmin(isAdminResult);
-                setUser(user);
             } else {
-                // If no user, redirect to login
+                console.log('[CompanyLayout] No se encontró ningún usuario autenticado. Redirigiendo a /login.');
                 router.push('/login');
             }
         };
 
         checkUserStatus().catch(error => {
-            console.error("Ocurrió un error durante la verificación inicial del usuario:", error);
+            console.error("[CompanyLayout] Ocurrió un error CRÍTICO durante la verificación inicial del usuario:", error);
             router.push('/login');
         }).finally(() => {
+            console.log('--- [CompanyLayout] Verificación de estado de usuario finalizada. ---');
             setIsLoading(false);
         });
 
