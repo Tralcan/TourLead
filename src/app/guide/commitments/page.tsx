@@ -153,47 +153,60 @@ export default function CommitmentsPage() {
 
     const fetchCommitments = React.useCallback(async () => {
         setIsLoading(true);
-        const { data: { user } } = await supabase.auth.getUser();
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
 
-        if (!user) {
+            if (!user) {
+                setIsLoading(false);
+                return;
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            const { data, error } = await supabase
+                .from('commitments')
+                .select(`
+                    id,
+                    job_type,
+                    description,
+                    start_date,
+                    end_date,
+                    guide_rating,
+                    company_rating,
+                    company:companies(*)
+                `)
+                .eq('guide_id', user.id)
+                .gte('end_date', today)
+                .order('start_date', { ascending: true });
+            
+            if (error) throw error;
+            
+            if (data) {
+                const transformedData = await Promise.all(data.map(async (c) => {
+                    if (!c.company) {
+                        console.warn(`El compromiso con id ${c.id} no tiene una empresa asociada o no se pudo cargar.`);
+                        return null;
+                    }
+                    const company = c.company as Company;
+                    const { rating, reviews } = await getCompanyRating(company.id);
+                    return {
+                        ...c,
+                        startDate: new Date(c.start_date!.replace(/-/g, '/')),
+                        endDate: new Date(c.end_date!.replace(/-/g, '/')),
+                        company: { ...company, rating, reviews }
+                    };
+                }));
+                setCommitments(transformedData.filter(Boolean) as unknown as Commitment[]);
+            }
+        } catch (error) {
+            console.error("Error al cargar compromisos:", error);
+            toast({ 
+                title: "Error", 
+                description: `No se pudieron cargar los compromisos.`, 
+                variant: "destructive" 
+            });
+        } finally {
             setIsLoading(false);
-            return;
         }
-
-        const today = new Date().toISOString().split('T')[0];
-        const { data, error } = await supabase
-            .from('commitments')
-            .select(`
-                id,
-                job_type,
-                description,
-                start_date,
-                end_date,
-                guide_rating,
-                company_rating,
-                company:companies(*)
-            `)
-            .eq('guide_id', user.id)
-            .gte('end_date', today)
-            .order('start_date', { ascending: true });
-        
-        if (data) {
-            const transformedData = await Promise.all(data.map(async (c) => {
-                const company = c.company as Company;
-                const { rating, reviews } = await getCompanyRating(company.id);
-                return {
-                    ...c,
-                    startDate: new Date(c.start_date!.replace(/-/g, '/')),
-                    endDate: new Date(c.end_date!.replace(/-/g, '/')),
-                    company: { ...company, rating, reviews }
-                }
-            }));
-            setCommitments(transformedData as unknown as Commitment[]);
-        } else {
-            console.error(error);
-            toast({ title: "Error", description: "No se pudieron cargar los compromisos.", variant: "destructive" });
-        }
-        setIsLoading(false);
     }, [supabase, toast]);
 
     React.useEffect(() => {
