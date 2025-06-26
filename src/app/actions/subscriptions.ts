@@ -56,7 +56,7 @@ const cancelSubscriptionSchema = z.object({
     subscriptionId: z.coerce.number(),
 });
 
-export async function cancelSubscription(data: z.infer<typeof cancelSubscriptionSchema>) {
+export async function cancelSubscription(formData: FormData) {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -75,7 +75,11 @@ export async function cancelSubscription(data: z.infer<typeof cancelSubscription
         return { success: false, message: 'No tienes permisos para realizar esta acción.' };
     }
     
-    const parsed = cancelSubscriptionSchema.safeParse(data);
+    const rawData = {
+        subscriptionId: formData.get('subscriptionId')
+    };
+    
+    const parsed = cancelSubscriptionSchema.safeParse(rawData);
 
     if (!parsed.success) {
         return { success: false, message: `Datos inválidos: ${parsed.error.errors.map(e => e.message).join(', ')}` };

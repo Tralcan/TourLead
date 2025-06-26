@@ -113,7 +113,10 @@ export default function AuditPage() {
         if (!selectedSubscription) return;
         setIsCanceling(true);
 
-        const result = await cancelSubscription({ subscriptionId: selectedSubscription.id });
+        const formData = new FormData();
+        formData.append('subscriptionId', String(selectedSubscription.id));
+
+        const result = await cancelSubscription(formData);
         
         if (result.success) {
             toast({ title: "Éxito", description: result.message });
