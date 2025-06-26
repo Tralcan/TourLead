@@ -22,26 +22,50 @@ export default async function Home() {
     .neq('languages', '{}')
     .gt('rate', 0);
   
-  // Fetch all availability and commitments to calculate net available days
+  // Fetch availability with guide IDs, and commitments with guide IDs
   const [availabilityRes, commitmentsRes] = await Promise.all([
-      supabase.from('guides').select('availability'),
-      supabase.from('commitments').select('start_date, end_date')
+      supabase.from('guides').select('id, availability'),
+      supabase.from('commitments').select('guide_id, start_date, end_date')
   ]);
 
   const { data: availabilityData } = availabilityRes;
   const { data: commitmentsData } = commitmentsRes;
 
-  // Calculate total available days, filtering for future dates
-  const totalAvailableDays = new Set<string>();
+  // Create a set of committed person-days for quick lookup.
+  // Key format: "guideId_YYYY-MM-DD"
+  const committedPersonDays = new Set<string>();
+  if (commitmentsData) {
+      for (const commitment of commitmentsData) {
+          if (!commitment.guide_id) continue;
+          try {
+              const daysInCommitment = eachDayOfInterval({
+                  start: parseISO(commitment.start_date),
+                  end: parseISO(commitment.end_date)
+              });
+              for (const day of daysInCommitment) {
+                  committedPersonDays.add(`${commitment.guide_id}_${format(day, 'yyyy-MM-dd')}`);
+              }
+          } catch(e) {
+              console.error(`Invalid date range in commitments: ${commitment.start_date} to ${commitment.end_date}`);
+          }
+      }
+  }
+
+  // Calculate total net available person-days
+  let netAvailablePersonDays = 0;
   if (availabilityData) {
     for (const guide of availabilityData) {
         if (guide.availability) {
             for (const dayString of guide.availability) {
                 try {
                     const day = parseISO(dayString);
-                    // Check if the date is today or in the future
+                    // Check 1: Is the day today or in the future?
                     if (!isBefore(day, today)) {
-                        totalAvailableDays.add(format(day, 'yyyy-MM-dd'));
+                        const formattedDay = format(day, 'yyyy-MM-dd');
+                        // Check 2: Is this guide committed on this day?
+                        if (!committedPersonDays.has(`${guide.id}_${formattedDay}`)) {
+                            netAvailablePersonDays++;
+                        }
                     }
                 } catch(e) {
                     // Ignore potential invalid date formats in the DB
@@ -50,32 +74,9 @@ export default async function Home() {
         }
     }
   }
-
-  // Calculate total committed days
-  const committedDays = new Set<string>();
-  if (commitmentsData) {
-      for (const commitment of commitmentsData) {
-          try {
-              const daysInCommitment = eachDayOfInterval({
-                  start: parseISO(commitment.start_date),
-                  end: parseISO(commitment.end_date)
-              });
-              for (const day of daysInCommitment) {
-                  committedDays.add(format(day, 'yyyy-MM-dd'));
-              }
-          } catch(e) {
-              console.error(`Invalid date range in commitments: ${commitment.start_date} to ${commitment.end_date}`);
-          }
-      }
-  }
-
-  // Subtract committed days from the total available set to get the net availability
-  committedDays.forEach(day => {
-      totalAvailableDays.delete(day);
-  });
   
   const displayGuideCount = guideCount ?? 0;
-  const displayTotalDays = totalAvailableDays.size;
+  const displayTotalDays = netAvailablePersonDays;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -99,7 +100,7 @@ export default async function Home() {
           </p>
           <div className="mt-6 max-w-3xl mx-auto">
             <p className="text-muted-foreground">
-              Explora una red de <strong className="text-foreground font-semibold">{displayGuideCount.toLocaleString('es-CL')} guías profesionales</strong> con más de <strong className="text-foreground font-semibold">{displayTotalDays.toLocaleString('es-CL')} días de disponibilidad futura</strong> combinada.
+              Explora una red de <strong className="text-foreground font-semibold">{displayGuideCount.toLocaleString('es-CL')} guías profesionales</strong> con más de <strong className="text-foreground font-semibold">{displayTotalDays.toLocaleString('es-CL')} días de disponibilidad combinada</strong>.
             </p>
           </div>
           <div className="mt-8 flex justify-center gap-4">
