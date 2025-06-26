@@ -66,6 +66,8 @@ async function getGuideRating(guideId: string) {
 const offerFormSchema = z.object({
     job_type: z.string().min(1, "El tipo de trabajo es requerido."),
     description: z.string().min(10, "La descripción debe tener al menos 10 caracteres.").max(500, "La descripción no puede exceder los 500 caracteres."),
+    contact_person: z.string().min(1, "El nombre de contacto es requerido."),
+    contact_phone: z.string().min(1, "El teléfono de contacto es requerido."),
   });
 type OfferFormValues = z.infer<typeof offerFormSchema>;
 
@@ -177,7 +179,7 @@ function OfferDialog({
     const router = useRouter();
     const form = useForm<OfferFormValues>({
         resolver: zodResolver(offerFormSchema),
-        defaultValues: { job_type: "", description: "" }
+        defaultValues: { job_type: "", description: "", contact_person: "", contact_phone: "" }
     });
     const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -190,6 +192,8 @@ function OfferDialog({
         formData.append('endDate', format(endDate, 'yyyy-MM-dd'));
         formData.append('jobType', values.job_type);
         formData.append('description', values.description);
+        formData.append('contactPerson', values.contact_person);
+        formData.append('contactPhone', values.contact_phone);
 
         const result = await createOffer(formData);
         
@@ -234,6 +238,32 @@ function OfferDialog({
                               <FormLabel>Descripción de la Oferta</FormLabel>
                               <FormControl>
                                 <Textarea placeholder="Describe los detalles del trabajo, responsabilidades, etc." {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                         <FormField
+                          control={form.control}
+                          name="contact_person"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Persona de Contacto para la Oferta</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Juan Pérez" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="contact_phone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Teléfono de Contacto</FormLabel>
+                              <FormControl>
+                                <Input placeholder="+56 9 1234 5678" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

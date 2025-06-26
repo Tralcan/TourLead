@@ -14,9 +14,11 @@ type SendOfferEmailProps = {
     jobType: string;
     startDate: Date;
     endDate: Date;
+    contactPerson: string;
+    contactPhone: string;
 }
 
-export async function sendOfferEmail({ to, guideName, companyName, jobType, startDate, endDate }: SendOfferEmailProps) {
+export async function sendOfferEmail({ to, guideName, companyName, jobType, startDate, endDate, contactPerson, contactPhone }: SendOfferEmailProps) {
     if (!process.env.RESEND_API_KEY) {
         console.error("La API Key de Resend no está configurada.");
         throw new Error("La configuración del servicio de correo está incompleta.");
@@ -38,6 +40,7 @@ export async function sendOfferEmail({ to, guideName, companyName, jobType, star
         <ul>
             <li><strong>Tipo de Trabajo:</strong> ${jobType}</li>
             <li><strong>Fechas:</strong> Del ${formattedStartDate} al ${formattedEndDate}</li>
+            <li><strong>Contacto para el trabajo:</strong> ${contactPerson} (${contactPhone})</li>
         </ul>
         <p>Para ver todos los detalles, aceptar o rechazar la oferta, por favor ingresa a tu panel haciendo clic en el siguiente botón:</p>
         <a href="${appUrl}/guide/offers" style="background-color: #FFB347; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Ver mis ofertas</a>
@@ -48,7 +51,7 @@ export async function sendOfferEmail({ to, guideName, companyName, jobType, star
       </div>
     `;
 
-    const textBody = `¡Hola ${guideName}!\n\nTienes una nueva oferta de trabajo de ${companyName} en TourLead Connect.\n\nDetalles de la Oferta:\n- Tipo de Trabajo: ${jobType}\n- Fechas: Del ${formattedStartDate} al ${formattedEndDate}\n\nPara ver todos los detalles, aceptar o rechazar la oferta, por favor ingresa a tu panel visitando la siguiente URL:\n${appUrl}/guide/offers\n\n¡Gracias por usar TourLead Connect!`;
+    const textBody = `¡Hola ${guideName}!\n\nTienes una nueva oferta de trabajo de ${companyName} en TourLead Connect.\n\nDetalles de la Oferta:\n- Tipo de Trabajo: ${jobType}\n- Fechas: Del ${formattedStartDate} al ${formattedEndDate}\n- Contacto para el trabajo: ${contactPerson} (${contactPhone})\n\nPara ver todos los detalles, aceptar o rechazar la oferta, por favor ingresa a tu panel visitando la siguiente URL:\n${appUrl}/guide/offers\n\n¡Gracias por usar TourLead Connect!`;
 
     return await resend.emails.send({
         from: from,

@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { JobOffer, Company } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Check, X, Eye, User as UserIcon, Phone, Smartphone, MapPin } from "lucide-react";
+import { Check, X, Eye, User as UserIcon, Phone, Smartphone, MapPin, Briefcase, PhoneCall } from "lucide-react";
 import { StarRatingDisplay } from "@/components/star-rating";
 import React from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -222,9 +222,27 @@ export default function OffersPage() {
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="space-y-2 pt-0">
-                        <p className="font-semibold">Fechas: <span className="font-normal">{format(offer.startDate, "d MMM, yyyy", { locale: es })} - {format(offer.endDate, "d MMM, yyyy", { locale: es })}</span></p>
-                        <p className="text-muted-foreground">{offer.description}</p>
+                    <CardContent className="space-y-4 pt-0">
+                        <div>
+                            <p className="font-semibold">Fechas: <span className="font-normal">{format(offer.startDate, "d MMM, yyyy", { locale: es })} - {format(offer.endDate, "d MMM, yyyy", { locale: es })}</span></p>
+                            <p className="text-muted-foreground">{offer.description}</p>
+                        </div>
+                        <div className="border-t pt-4 space-y-2 text-sm">
+                             <div className="flex items-center gap-3">
+                                <UserIcon className="h-4 w-4 text-muted-foreground" />
+                                <div>
+                                    <p className="font-semibold">Contacto para la oferta</p>
+                                    <p className="text-muted-foreground">{offer.contact_person}</p>
+                                </div>
+                            </div>
+                             <div className="flex items-center gap-3">
+                                <PhoneCall className="h-4 w-4 text-muted-foreground" />
+                                 <div>
+                                    <p className="font-semibold">Teléfono</p>
+                                    <p className="text-muted-foreground">{offer.contact_phone}</p>
+                                </div>
+                            </div>
+                        </div>
                     </CardContent>
                     <CardFooter className="gap-4">
                         <Button onClick={() => handleAccept(offer)} className="bg-green-500 hover:bg-green-600 text-white">

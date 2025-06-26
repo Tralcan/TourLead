@@ -11,6 +11,8 @@ const offerSchema = z.object({
     description: z.string().min(1, "La descripción es requerida."),
     startDate: z.string().min(1, "La fecha de inicio es requerida."),
     endDate: z.string().min(1, "La fecha de fin es requerida."),
+    contactPerson: z.string().min(1, "La persona de contacto es requerida."),
+    contactPhone: z.string().min(1, "El teléfono de contacto es requerido."),
 });
 
 export async function createOffer(formData: FormData) {
@@ -27,6 +29,8 @@ export async function createOffer(formData: FormData) {
         description: formData.get('description'),
         startDate: formData.get('startDate'),
         endDate: formData.get('endDate'),
+        contactPerson: formData.get('contactPerson'),
+        contactPhone: formData.get('contactPhone'),
     };
 
     const parsed = offerSchema.safeParse(rawData);
@@ -35,7 +39,7 @@ export async function createOffer(formData: FormData) {
         return { success: false, message: `Datos de formulario inválidos: ${parsed.error.errors.map(e => e.message).join(', ')}` };
     }
 
-    const { guideId, jobType, description, startDate, endDate } = parsed.data;
+    const { guideId, jobType, description, startDate, endDate, contactPerson, contactPhone } = parsed.data;
 
     const { error: insertError } = await supabase.from('offers').insert({
         guide_id: guideId,
@@ -44,7 +48,9 @@ export async function createOffer(formData: FormData) {
         description: description,
         start_date: startDate,
         end_date: endDate,
-        status: 'pending'
+        status: 'pending',
+        contact_person: contactPerson,
+        contact_phone: contactPhone,
     });
 
     if (insertError) {
@@ -76,7 +82,9 @@ export async function createOffer(formData: FormData) {
             companyName: companyData.name || 'Una empresa',
             jobType: jobType,
             startDate: new Date(startDate.replace(/-/g, '/')),
-            endDate: new Date(endDate.replace(/-/g, '/'))
+            endDate: new Date(endDate.replace(/-/g, '/')),
+            contactPerson: contactPerson,
+            contactPhone: contactPhone,
         });
     } catch (emailError) {
         console.error("Error al enviar el email:", emailError);

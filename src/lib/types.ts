@@ -37,6 +37,8 @@ export type JobOffer = {
   guide_id: string; // UUID del guía
   job_type: string | null;
   description: string | null;
+  contact_person: string | null;
+  contact_phone: string | null;
   startDate: Date;
   endDate: Date;
   status: 'pending' | 'accepted' | 'rejected';
