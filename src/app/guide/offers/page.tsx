@@ -216,10 +216,6 @@ export default function OffersPage() {
                                         <CardDescription>De {offer.company.name}</CardDescription>
                                     </div>
                                      <div className="flex items-center gap-2">
-                                        <Button variant="outline" size="sm" onClick={() => handleViewProfile(offer.company)}>
-                                            <Eye className="mr-2 h-4 w-4" />
-                                            Ver Empresa
-                                        </Button>
                                         <StarRatingDisplay rating={offer.company.rating} reviews={offer.company.reviews} />
                                     </div>
                                 </div>
@@ -238,6 +234,10 @@ export default function OffersPage() {
                         <Button onClick={() => handleDecline(offer)} variant="destructive">
                             <X className="mr-2 h-4 w-4" />
                             Rechazar
+                        </Button>
+                         <Button variant="outline" onClick={() => handleViewProfile(offer.company)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver Perfil
                         </Button>
                     </CardFooter>
                 </Card>
