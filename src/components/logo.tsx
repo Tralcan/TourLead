@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Mountain } from "lucide-react";
 
-export function Logo() {
+export function Logo({ onClick }: { onClick?: () => void }) {
   return (
-    <Link href="/" className="flex items-center gap-2 text-foreground">
+    <Link href="/" className="flex items-center gap-2 text-foreground" onClick={onClick}>
       <div className="p-2 bg-accent rounded-md text-accent-foreground">
         <Mountain className="h-6 w-6" />
       </div>

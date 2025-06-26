@@ -28,6 +28,7 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
     const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [pendingOffersCount, setPendingOffersCount] = React.useState(0);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
     React.useEffect(() => {
         const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -113,7 +114,7 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
     }
     
     const MobileNav = (
-        <Sheet>
+        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
                 <Button size="icon" variant="outline" className="sm:hidden">
                     <PanelLeft className="h-5 w-5" />
@@ -122,11 +123,12 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
             </SheetTrigger>
             <SheetContent side="left" className="sm:max-w-xs">
                 <nav className="grid gap-6 text-lg font-medium">
-                    <Logo />
+                    <Logo onClick={() => setIsMobileMenuOpen(false)} />
                     {navItems.map((item) => (
                         <Link
                             key={item.href}
                             href={item.href}
+                            onClick={() => setIsMobileMenuOpen(false)}
                             className={`flex items-center gap-4 px-2.5 ${
                                 pathname.startsWith(item.href)
                                     ? 'text-foreground'
