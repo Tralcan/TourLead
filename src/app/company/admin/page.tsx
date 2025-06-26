@@ -5,10 +5,11 @@ import React from 'react';
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, ClipboardList } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,9 +115,17 @@ export default function AdminPage() {
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>Panel de Administración de Suscripciones</CardTitle>
-                <CardDescription>Crea o renueva suscripciones para las empresas de la plataforma.</CardDescription>
+            <CardHeader className="flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Panel de Administración de Suscripciones</CardTitle>
+                    <CardDescription>Crea o renueva suscripciones para las empresas de la plataforma.</CardDescription>
+                </div>
+                 <Button variant="outline" asChild>
+                    <Link href="/company/admin/audit">
+                        <ClipboardList className="mr-2 h-4 w-4" />
+                        Ver Auditoría
+                    </Link>
+                </Button>
             </CardHeader>
             <CardContent>
                 <Form {...form}>
