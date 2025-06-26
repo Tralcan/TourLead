@@ -125,8 +125,10 @@ export default function ReputationPage() {
                                 <TableRow key={index}>
                                     <TableCell className="font-medium">{item.company?.name || 'Empresa Desconocida'}</TableCell>
                                     <TableCell>{item.job_type || 'No especificado'}</TableCell>
-                                    <TableCell className="text-right">
-                                        <StarRatingDisplay rating={item.guide_rating!} />
+                                    <TableCell>
+                                        <div className="flex justify-end">
+                                            <StarRatingDisplay rating={item.guide_rating!} />
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                                 ))
