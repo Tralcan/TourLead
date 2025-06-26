@@ -2,19 +2,21 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Building2, Search, Users, PanelLeft, UserCircle, Mountain, LogOut, Star } from 'lucide-react';
+import { Building2, Search, Users, PanelLeft, UserCircle, Mountain, LogOut, Star, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { createClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
-const navItems = [
+const baseNavItems = [
     { href: '/company/hired', icon: Users, label: 'Guías Contratados' },
     { href: '/company/search', icon: Search, label: 'Buscar Guías' },
     { href: '/company/reputation', icon: Star, label: 'Reputación' },
     { href: '/company/profile', icon: Building2, label: 'Perfil de la Empresa' },
 ];
+
+const adminNavItem = { href: '/company/admin', icon: Shield, label: 'Administración' };
 
 const supabase = createClient();
 
@@ -23,6 +25,8 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
     const router = useRouter();
     const [user, setUser] = React.useState<User | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [isAdmin, setIsAdmin] = React.useState(false);
+    const [navItems, setNavItems] = React.useState(baseNavItems);
 
     React.useEffect(() => {
         const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -51,6 +55,21 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                                 throw insertError;
                             }
                         }
+                        
+                        const { data: adminData, error: adminError } = await supabase
+                            .from('admins')
+                            .select('user_id')
+                            .eq('user_id', session.user.id)
+                            .single();
+
+                        if (adminError && adminError.code !== 'PGRST116') {
+                             console.error("CompanyLayout: Error checking for admin:", adminError);
+                        }
+
+                        const userIsAdmin = !!adminData;
+                        setIsAdmin(userIsAdmin);
+                        setNavItems(userIsAdmin ? [...baseNavItems, adminNavItem] : baseNavItems);
+
                         setUser(session.user);
 
                     } else {
