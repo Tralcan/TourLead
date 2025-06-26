@@ -162,7 +162,7 @@ export default function CommitmentsPage() {
             }
 
             const today = new Date().toISOString().split('T')[0];
-            const { data, error } = await supabase
+            const { data: commitmentsData, error: commitmentsError } = await supabase
                 .from('commitments')
                 .select(`
                     id,
@@ -171,28 +171,46 @@ export default function CommitmentsPage() {
                     end_date,
                     guide_rating,
                     company_rating,
-                    company:companies(*),
-                    offer:offers(description)
+                    offer_id,
+                    company:companies(*)
                 `)
                 .eq('guide_id', user.id)
                 .gte('end_date', today)
                 .order('start_date', { ascending: true });
             
-            if (error) throw error;
+            if (commitmentsError) throw commitmentsError;
             
-            if (data) {
-                const transformedData = await Promise.all(data.map(async (c) => {
+            if (commitmentsData) {
+                const transformedData = await Promise.all(commitmentsData.map(async (c) => {
                     if (!c.company) {
                         console.warn(`El compromiso con id ${c.id} no tiene una empresa asociada o no se pudo cargar.`);
                         return null;
                     }
+                    
                     const company = c.company as Company;
                     const { rating, reviews } = await getCompanyRating(company.id);
+
+                    let offerDescription = null;
+                    if (c.offer_id) {
+                        const { data: offerData, error: offerError } = await supabase
+                            .from('offers')
+                            .select('description')
+                            .eq('id', c.offer_id)
+                            .single();
+                        
+                        if (offerError && offerError.code !== 'PGRST116') {
+                             console.error(`Error fetching description for offer ${c.offer_id}:`, offerError);
+                        } else if (offerData) {
+                            offerDescription = offerData.description;
+                        }
+                    }
+
                     return {
                         ...c,
                         startDate: new Date(c.start_date!.replace(/-/g, '/')),
                         endDate: new Date(c.end_date!.replace(/-/g, '/')),
-                        company: { ...company, rating, reviews }
+                        company: { ...company, rating, reviews },
+                        offer: { description: offerDescription }
                     };
                 }));
                 setCommitments(transformedData.filter(Boolean) as unknown as Commitment[]);
