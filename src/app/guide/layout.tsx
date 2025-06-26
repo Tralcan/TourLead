@@ -25,6 +25,7 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
     const [user, setUser] = React.useState<SupabaseUser | null>(null);
     const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [pendingOffersCount, setPendingOffersCount] = React.useState(0);
 
     React.useEffect(() => {
         const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -60,10 +61,23 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
                             }
                         }
 
+                        const { count, error: countError } = await supabase
+                            .from('offers')
+                            .select('id', { count: 'exact', head: true })
+                            .eq('guide_id', session.user.id)
+                            .eq('status', 'pending');
+
+                        if (countError) {
+                            console.error("Error fetching pending offers count:", countError);
+                        } else {
+                            setPendingOffersCount(count ?? 0);
+                        }
+
                         setUser(session.user);
 
                     } else {
                         router.push('/login');
+                        setPendingOffersCount(0);
                     }
                 } catch (error) {
                     console.error("GuideLayout: An error occurred in onAuthStateChange logic:", error);
@@ -114,7 +128,7 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
                             <TooltipTrigger asChild>
                                 <Link
                                     href={item.href}
-                                    className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors md:h-8 md:w-8 ${
+                                    className={`relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors md:h-8 md:w-8 ${
                                         pathname.startsWith(item.href)
                                             ? 'bg-accent text-accent-foreground'
                                             : 'text-muted-foreground hover:text-foreground'
@@ -122,6 +136,9 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
                                 >
                                     <item.icon className="h-5 w-5" />
                                     <span className="sr-only">{item.label}</span>
+                                     {item.label === 'Ofertas de Trabajo' && pendingOffersCount > 0 && (
+                                        <span className="absolute top-0.5 right-0.5 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background" />
+                                    )}
                                 </Link>
                             </TooltipTrigger>
                             <TooltipContent side="right">{item.label}</TooltipContent>
