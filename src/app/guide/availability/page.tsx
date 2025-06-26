@@ -4,7 +4,6 @@
 import * as React from "react"
 import { isBefore, startOfToday, eachDayOfInterval } from "date-fns"
 import { es } from "date-fns/locale";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,7 +31,6 @@ const formatLocalDate = (date: Date): string => {
 export default function AvailabilityPage() {
   const today = startOfToday();
   const { toast } = useToast();
-  const router = useRouter();
   const supabase = createClient();
   const [days, setDays] = React.useState<Date[] | undefined>([]);
   const [bookedDays, setBookedDays] = React.useState<Date[]>([]);
@@ -102,7 +100,6 @@ export default function AvailabilityPage() {
             title: "Disponibilidad Guardada",
             description: "Tu calendario ha sido actualizado correctamente.",
         })
-        router.push('/guide/commitments');
     }
   }
 
