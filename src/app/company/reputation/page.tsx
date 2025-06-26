@@ -20,11 +20,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 type ReputationData = {
     job_type: string | null;
     company_rating: number | null;
     guide: Guide | null;
+    end_date: string;
 };
 
 function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: Guide, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
@@ -98,9 +101,10 @@ export default function ReputationPage() {
             try {
                 const { data, error } = await supabase
                     .from('commitments')
-                    .select('job_type, company_rating, guide_rating, guide:guides(*)')
+                    .select('job_type, company_rating, guide_rating, end_date, guide:guides(*)')
                     .eq('company_id', user.id)
-                    .not('company_rating', 'is', null);
+                    .not('company_rating', 'is', null)
+                    .order('end_date', { ascending: false });
 
                 if (error) throw error;
 
@@ -172,40 +176,43 @@ export default function ReputationPage() {
                             <TableRow>
                                 <TableHead>Guía</TableHead>
                                 <TableHead>Trabajo</TableHead>
+                                <TableHead>Fecha</TableHead>
                                 <TableHead className="text-right">Calificación Recibida</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center">Cargando evaluaciones...</TableCell>
+                                    <TableCell colSpan={5} className="text-center">Cargando evaluaciones...</TableCell>
                                 </TableRow>
                             ) : reputationData.length > 0 ? (
                                 reputationData.map((item, index) => (
                                 <TableRow key={index}>
                                     <TableCell className="font-medium">
-                                        {item.guide ? (
-                                            <button
-                                                onClick={() => handleViewProfile(item.guide!)}
-                                                className="text-left font-medium text-primary hover:underline"
-                                            >
-                                                {item.guide.name || 'Guía Desconocido'}
-                                            </button>
-                                        ) : (
-                                            'Guía Desconocido'
-                                        )}
+                                        {item.guide?.name || 'Guía Desconocido'}
                                     </TableCell>
                                     <TableCell>{item.job_type || 'No especificado'}</TableCell>
+                                    <TableCell>
+                                        {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
+                                    </TableCell>
                                     <TableCell>
                                         <div className="flex justify-end">
                                             <StarRatingDisplay rating={item.company_rating!} />
                                         </div>
                                     </TableCell>
+                                    <TableCell className="text-right">
+                                        {item.guide && (
+                                            <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide!)}>
+                                                Ver Perfil
+                                            </Button>
+                                        )}
+                                    </TableCell>
                                 </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center text-muted-foreground">
+                                    <TableCell colSpan={5} className="text-center text-muted-foreground">
                                         No tienes evaluaciones visibles. Califica a un guía para ver su evaluación.
                                     </TableCell>
                                 </TableRow>

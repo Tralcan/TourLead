@@ -20,11 +20,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 type ReputationData = {
     job_type: string | null;
     guide_rating: number | null;
     company: Company | null;
+    end_date: string;
 };
 
 
@@ -115,9 +118,10 @@ export default function ReputationPage() {
             try {
                 const { data, error } = await supabase
                     .from('commitments')
-                    .select('job_type, guide_rating, company_rating, company:companies(*)')
+                    .select('job_type, guide_rating, company_rating, end_date, company:companies(*)')
                     .eq('guide_id', user.id)
-                    .not('guide_rating', 'is', null);
+                    .not('guide_rating', 'is', null)
+                    .order('end_date', { ascending: false });
 
                 if (error) throw error;
 
@@ -189,40 +193,43 @@ export default function ReputationPage() {
                             <TableRow>
                                 <TableHead>Empresa</TableHead>
                                 <TableHead>Trabajo</TableHead>
+                                <TableHead>Fecha</TableHead>
                                 <TableHead className="text-right">Calificación Recibida</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center">Cargando evaluaciones...</TableCell>
+                                    <TableCell colSpan={5} className="text-center">Cargando evaluaciones...</TableCell>
                                 </TableRow>
                             ) : reputationData.length > 0 ? (
                                 reputationData.map((item, index) => (
                                 <TableRow key={index}>
                                     <TableCell className="font-medium">
-                                        {item.company ? (
-                                            <button
-                                                onClick={() => handleViewProfile(item.company!)}
-                                                className="text-left font-medium text-primary hover:underline"
-                                            >
-                                                {item.company.name || 'Empresa Desconocida'}
-                                            </button>
-                                        ) : (
-                                            'Empresa Desconocida'
-                                        )}
+                                        {item.company?.name || 'Empresa Desconocida'}
                                     </TableCell>
                                     <TableCell>{item.job_type || 'No especificado'}</TableCell>
+                                    <TableCell>
+                                        {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
+                                    </TableCell>
                                     <TableCell>
                                         <div className="flex justify-end">
                                             <StarRatingDisplay rating={item.guide_rating!} />
                                         </div>
                                     </TableCell>
+                                    <TableCell className="text-right">
+                                        {item.company && (
+                                            <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.company!)}>
+                                                Ver Perfil
+                                            </Button>
+                                        )}
+                                    </TableCell>
                                 </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center text-muted-foreground">
+                                    <TableCell colSpan={5} className="text-center text-muted-foreground">
                                         No tienes evaluaciones visibles. Califica a una empresa para ver su evaluación.
                                     </TableCell>
                                 </TableRow>
