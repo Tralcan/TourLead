@@ -4,7 +4,7 @@
 import React from "react";
 import { format, isPast } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, DollarSign, User, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, DollarSign, User, Loader2, ShieldCheck } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -283,6 +283,67 @@ function OfferDialog({
     )
 }
 
+function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: Guide, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+    if (!guide) return null;
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader className="flex flex-row items-center gap-4">
+                     <Avatar className="h-16 w-16">
+                        <AvatarImage src={guide.avatar ?? ''} alt={guide.name ?? ''} />
+                        <AvatarFallback>{guide.name?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-1">
+                        <DialogTitle className="text-2xl">{guide.name}</DialogTitle>
+                        <DialogDescription>
+                            {guide.email} {guide.phone && `• ${guide.phone}`}
+                        </DialogDescription>
+                        <StarRatingDisplay rating={guide.rating ?? 0} reviews={guide.reviews} />
+                    </div>
+                </DialogHeader>
+                <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                    {guide.summary && <p className="text-sm text-muted-foreground">{guide.summary}</p>}
+                    <div>
+                        <h4 className="font-semibold text-sm mb-2">Especialidades</h4>
+                        <div className="flex flex-wrap gap-2">
+                             {guide.specialties?.length ? guide.specialties.map(spec => <Badge key={spec} variant="secondary">{spec}</Badge>) : <p className="text-sm text-muted-foreground">No especificado</p>}
+                        </div>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-sm mb-2">Idiomas</h4>
+                         <div className="flex flex-wrap gap-2">
+                             {guide.languages?.length ? guide.languages.map(lang => <Badge key={lang} variant="secondary">{lang}</Badge>) : <p className="text-sm text-muted-foreground">No especificado</p>}
+                        </div>
+                    </div>
+                    <div className="border-t pt-4 mt-4">
+                        <h4 className="font-semibold text-sm mb-2">Información Académica</h4>
+                        <div className="space-y-2 text-sm text-muted-foreground">
+                            {guide.career && <p><span className="font-medium text-foreground">Carrera:</span> {guide.career}</p>}
+                            {guide.institution && <p><span className="font-medium text-foreground">Institución:</span> {guide.institution}</p>}
+                            {guide.is_certified && (
+                                <div className="flex items-center gap-2 pt-1">
+                                    <ShieldCheck className="h-5 w-5 text-green-600" />
+                                    <span className="font-medium text-foreground">Titulado</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    {guide.rate && (
+                        <div className="mt-4 border-t pt-4">
+                            <h4 className="font-semibold text-sm mb-2">Tarifa por día</h4>
+                            <p className="font-semibold">${guide.rate}</p>
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+                        Cerrar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
 
 export default function SearchGuidesPage() {
     const { toast } = useToast();
@@ -301,6 +362,9 @@ export default function SearchGuidesPage() {
 
     const [selectedGuide, setSelectedGuide] = React.useState<Guide | null>(null);
     const [isOfferDialogOpen, setIsOfferDialogOpen] = React.useState(false);
+    
+    const [selectedGuideForProfile, setSelectedGuideForProfile] = React.useState<Guide | null>(null);
+    const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false);
 
     const [selectedGuideForRatings, setSelectedGuideForRatings] = React.useState<Guide | null>(null);
     const [isRatingDialogOpen, setIsRatingDialogOpen] = React.useState(false);
@@ -391,6 +455,11 @@ export default function SearchGuidesPage() {
         setIsSearching(false);
     }
     
+    const handleViewProfile = (guide: Guide) => {
+        setSelectedGuideForProfile(guide);
+        setIsProfileDialogOpen(true);
+    };
+
     const handleOfferClick = (guide: Guide) => {
         if (!startDate || !endDate) {
             toast({ title: "Fechas Requeridas", description: "Por favor, selecciona una fecha de inicio y fin para hacer una oferta.", variant: "destructive" });
@@ -525,7 +594,10 @@ export default function SearchGuidesPage() {
                                         </button>
                                     </div>
                                 </CardContent>
-                                <CardFooter>
+                                <CardFooter className="gap-2">
+                                    <Button variant="outline" className="w-full" onClick={() => handleViewProfile(guide)}>
+                                        Ver Perfil
+                                    </Button>
                                     <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => handleOfferClick(guide)}>
                                         Ofertar
                                     </Button>
@@ -561,6 +633,14 @@ export default function SearchGuidesPage() {
                     guide={selectedGuideForRatings}
                     isOpen={isRatingDialogOpen}
                     onOpenChange={setIsRatingDialogOpen}
+                />
+            )}
+
+            {selectedGuideForProfile && (
+                <GuideProfileDialog
+                    guide={selectedGuideForProfile}
+                    isOpen={isProfileDialogOpen}
+                    onOpenChange={setIsProfileDialogOpen}
                 />
             )}
         </div>

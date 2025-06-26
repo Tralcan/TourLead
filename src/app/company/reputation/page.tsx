@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { StarRatingDisplay } from "@/components/star-rating";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Star, UserCheck, MessageSquare } from "lucide-react";
+import { Star, UserCheck, MessageSquare, ShieldCheck } from "lucide-react";
 import type { Guide } from "@/lib/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -84,6 +84,19 @@ function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: Guide, isO
                         <h4 className="font-semibold text-sm mb-2">Idiomas</h4>
                          <div className="flex flex-wrap gap-2">
                              {guide.languages?.length ? guide.languages.map(lang => <Badge key={lang} variant="secondary">{lang}</Badge>) : <p className="text-sm text-muted-foreground">No especificado</p>}
+                        </div>
+                    </div>
+                    <div className="border-t pt-4 mt-4">
+                        <h4 className="font-semibold text-sm mb-2">Información Académica</h4>
+                        <div className="space-y-2 text-sm text-muted-foreground">
+                            {guide.career && <p><span className="font-medium text-foreground">Carrera:</span> {guide.career}</p>}
+                            {guide.institution && <p><span className="font-medium text-foreground">Institución:</span> {guide.institution}</p>}
+                            {guide.is_certified && (
+                                <div className="flex items-center gap-2 pt-1">
+                                    <ShieldCheck className="h-5 w-5 text-green-600" />
+                                    <span className="font-medium text-foreground">Titulado</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                     {guide.rate && (
