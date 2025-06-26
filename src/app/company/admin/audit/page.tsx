@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, isPast } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Download } from "lucide-react";
+import * as XLSX from 'xlsx';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,11 +26,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cancelSubscription } from '@/app/actions/subscriptions';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const supabase = createClient();
 
 type SubscriptionRecord = {
-    id: string; // Corrected from number to string to handle UUIDs
+    id: string;
     start_date: string;
     end_date: string;
     company_id: string;
@@ -40,6 +42,11 @@ type SubscriptionRecord = {
     cancelingAdminName?: string | null;
 }
 
+type Company = {
+    id: string;
+    name: string;
+}
+
 export default function AuditPage() {
     const { toast } = useToast();
     const router = useRouter();
@@ -48,6 +55,8 @@ export default function AuditPage() {
     const [isCanceling, setIsCanceling] = React.useState(false);
     const [isAlertOpen, setIsAlertOpen] = React.useState(false);
     const [selectedSubscription, setSelectedSubscription] = React.useState<SubscriptionRecord | null>(null);
+    const [companies, setCompanies] = React.useState<Company[]>([]);
+    const [selectedCompany, setSelectedCompany] = React.useState<string>("all");
 
     const fetchAuditLog = React.useCallback(async () => {
         setIsLoading(true);
@@ -73,7 +82,7 @@ export default function AuditPage() {
         try {
             const [subscriptionsRes, companiesRes] = await Promise.all([
                 supabase.from('subscriptions').select('*').order('start_date', { ascending: false }),
-                supabase.from('companies').select('id, name')
+                supabase.from('companies').select('id, name').order('name')
             ]);
 
             const { data: subscriptionsData, error: subscriptionsError } = subscriptionsRes;
@@ -81,6 +90,10 @@ export default function AuditPage() {
 
             const { data: companiesData, error: companiesError } = companiesRes;
             if (companiesError) throw companiesError;
+            
+            if (companiesData) {
+                setCompanies(companiesData as Company[]);
+            }
 
             if (subscriptionsData && companiesData) {
                 const companiesMap = new Map(companiesData.map(c => [c.id, c.name]));
@@ -103,6 +116,13 @@ export default function AuditPage() {
     React.useEffect(() => {
         fetchAuditLog();
     }, [fetchAuditLog]);
+    
+    const filteredAuditLog = React.useMemo(() => {
+        if (selectedCompany === "all") {
+            return auditLog;
+        }
+        return auditLog.filter(log => log.company_id === selectedCompany);
+    }, [auditLog, selectedCompany]);
 
     const handleOpenCancelDialog = (subscription: SubscriptionRecord) => {
         setSelectedSubscription(subscription);
@@ -130,6 +150,21 @@ export default function AuditPage() {
         setIsCanceling(false);
     };
 
+    const handleExport = () => {
+        const dataToExport = filteredAuditLog.map(log => ({
+            'Empresa Suscrita': log.companyName,
+            'Periodo': `${format(new Date(log.start_date.replace(/-/g, '/')), "yyyy-MM-dd")} - ${format(new Date(log.end_date.replace(/-/g, '/')), "yyyy-MM-dd")}`,
+            'Estado': log.canceled_by_admin_id ? 'Cancelada' : !isPast(new Date(log.end_date.replace(/-/g, '/'))) ? 'Activa' : 'Expirada',
+            'Creada Por': log.adminName,
+            'Cancelada Por': log.cancelingAdminName || 'N/A'
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "AuditoriaSuscripciones");
+        XLSX.writeFile(workbook, "auditoria_suscripciones.xlsx");
+    };
+
     if (isLoading) {
         return (
             <Card>
@@ -146,17 +181,36 @@ export default function AuditPage() {
     return (
         <>
             <Card>
-                <CardHeader className="flex-row items-center justify-between">
-                    <div>
-                        <CardTitle>Auditoría de Suscripciones</CardTitle>
-                        <CardDescription>Un historial de todas las suscripciones creadas en la plataforma.</CardDescription>
+                <CardHeader>
+                    <div className="flex-row items-center justify-between sm:flex">
+                        <div>
+                            <CardTitle>Auditoría de Suscripciones</CardTitle>
+                            <CardDescription>Un historial de todas las suscripciones creadas en la plataforma.</CardDescription>
+                        </div>
+                        <Button variant="outline" asChild className="mt-4 sm:mt-0">
+                            <Link href="/company/admin">
+                                <ArrowLeft className="mr-2 h-4 w-4" />
+                                Volver
+                            </Link>
+                        </Button>
                     </div>
-                    <Button variant="outline" asChild>
-                        <Link href="/company/admin">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Volver
-                        </Link>
-                    </Button>
+                    <div className="flex items-center gap-4 pt-4 border-t mt-4">
+                        <Select onValueChange={setSelectedCompany} value={selectedCompany}>
+                            <SelectTrigger className="w-full sm:w-[250px]">
+                                <SelectValue placeholder="Filtrar por empresa" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todas las empresas</SelectItem>
+                                {companies.map(company => (
+                                    <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Button onClick={handleExport} disabled={filteredAuditLog.length === 0}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Exportar a Excel
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -170,8 +224,8 @@ export default function AuditPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {auditLog.length > 0 ? (
-                                auditLog.map(log => {
+                            {filteredAuditLog.length > 0 ? (
+                                filteredAuditLog.map(log => {
                                     const isCancelled = !!log.canceled_by_admin_id;
                                     const isActive = !isPast(new Date(log.end_date.replace(/-/g, '/')));
                                     
@@ -209,7 +263,7 @@ export default function AuditPage() {
                             ) : (
                                 <TableRow>
                                     <TableCell colSpan={5} className="text-center text-muted-foreground">
-                                        No hay registros de suscripción.
+                                        No hay registros de suscripción para el filtro seleccionado.
                                         <br />
                                         <span className="text-xs">(Si el problema persiste, revisa las políticas de lectura RLS en Supabase.)</span>
                                     </TableCell>
