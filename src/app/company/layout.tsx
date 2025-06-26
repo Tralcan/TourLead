@@ -18,9 +18,8 @@ const baseNavItems = [
 
 const adminNavItem = { href: '/company/admin', icon: Shield, label: 'Administración' };
 
-const supabase = createClient();
-
 export default function CompanyLayout({ children }: { children: React.ReactNode }) {
+    const supabase = createClient();
     const pathname = usePathname();
     const router = useRouter();
     const [user, setUser] = React.useState<User | null>(null);
@@ -104,7 +103,7 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
         return () => {
             authListener.subscription.unsubscribe();
         };
-    }, [router]);
+    }, [router, supabase]);
     
     const handleSignOut = async () => {
         await supabase.auth.signOut();
