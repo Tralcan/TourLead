@@ -44,7 +44,7 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                     .single();
                 
                 if(selectError && selectError.code !== 'PGRST116') {
-                    console.error("CompanyLayout: Error checking for profile:", selectError);
+                    console.error("Error al verificar el perfil de la empresa:", selectError);
                     throw selectError;
                 }
 
@@ -55,27 +55,23 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
                         name: user.user_metadata?.full_name || 'Nueva Empresa',
                     });
                     if (insertError) {
-                        console.error("CompanyLayout: Error creating new profile:", insertError);
+                        console.error("Error al crear un nuevo perfil de empresa:", insertError);
                         throw insertError;
                     }
                 }
                 
                 // Check for admin privileges
-                console.log(`CompanyLayout: Checking admin status for user_id: ${user.id}`);
                 const { data: adminData, error: adminError } = await supabase
                     .from('admins')
                     .select('user_id')
                     .eq('user_id', user.id)
                     .single();
                 
-                console.log('CompanyLayout: Admin check query result:', { adminData, adminError });
-
                 if (adminError && adminError.code !== 'PGRST116') { // 'PGRST116' is the code for 'single row not found'
-                     console.error("CompanyLayout: Error checking for admin privilege:", adminError);
+                     console.error("Error al verificar los privilegios de administrador:", adminError);
                 }
 
                 const isAdminResult = !!adminData;
-                console.log(`CompanyLayout: Setting isAdmin state to: ${isAdminResult}`);
                 setIsAdmin(isAdminResult);
                 setUser(user);
             } else {
@@ -85,7 +81,7 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
         };
 
         checkUserStatus().catch(error => {
-            console.error("CompanyLayout: An error occurred during initial user check:", error);
+            console.error("Ocurrió un error durante la verificación inicial del usuario:", error);
             router.push('/login');
         }).finally(() => {
             setIsLoading(false);
