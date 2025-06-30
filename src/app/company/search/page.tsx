@@ -8,7 +8,7 @@ import { Calendar as CalendarIcon, DollarSign, User, Loader2, ShieldCheck } from
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -36,7 +36,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { createOffer } from "@/app/actions/offers";
+import { createOffer, addGuidesToOfferCampaign } from "@/app/actions/offers";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -168,13 +168,15 @@ function OfferDialog({
     startDate, 
     endDate, 
     isOpen, 
-    onOpenChange 
+    onOpenChange,
+    initialValues
 }: { 
     guides: Guide[], 
     startDate: Date, 
     endDate: Date, 
     isOpen: boolean, 
-    onOpenChange: (open: boolean) => void 
+    onOpenChange: (open: boolean) => void,
+    initialValues?: OfferFormValues | null
 }) {
     const { toast } = useToast();
     const router = useRouter();
@@ -184,24 +186,33 @@ function OfferDialog({
     });
     const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+    React.useEffect(() => {
+        if (initialValues) {
+            form.reset(initialValues);
+        } else {
+            form.reset({ job_type: "", description: "", contact_person: "", contact_phone: "" });
+        }
+    }, [initialValues, form]);
+
+
     const onSubmit = async (values: OfferFormValues) => {
         setIsSubmitting(true);
-        
-        const formData = new FormData();
-        guides.forEach(guide => {
-            formData.append('guideId', guide.id);
-        });
-        formData.append('startDate', format(startDate, 'yyyy-MM-dd'));
-        formData.append('endDate', format(endDate, 'yyyy-MM-dd'));
-        formData.append('jobType', values.job_type);
-        formData.append('description', values.description);
-        formData.append('contactPerson', values.contact_person);
-        formData.append('contactPhone', values.contact_phone);
+        const isAdding = !!initialValues;
 
-        const result = await createOffer(formData);
+        const result = isAdding 
+            ? await addGuidesToOfferCampaign({
+                guideIds: guides.map(g => g.id),
+                startDate: format(startDate, 'yyyy-MM-dd'),
+                endDate: format(endDate, 'yyyy-MM-dd'),
+                jobType: values.job_type,
+                description: values.description,
+                contactPerson: values.contact_person,
+                contactPhone: values.contact_phone,
+            })
+            : await createOffer(getFormData(values));
         
         if (result.success) {
-            toast({ title: "¡Oferta Enviada!", description: `Tu oferta ha sido enviada a ${guides.length} ${guides.length === 1 ? 'guía' : 'guías'}.` });
+            toast({ title: "¡Oferta Enviada!", description: result.message });
             router.push('/company/hired');
         } else {
             toast({ title: "Error", description: result.message, variant: "destructive" });
@@ -209,11 +220,23 @@ function OfferDialog({
         setIsSubmitting(false);
     };
 
+    const getFormData = (values: OfferFormValues) => {
+        const formData = new FormData();
+        guides.forEach(guide => formData.append('guideId', guide.id));
+        formData.append('startDate', format(startDate, 'yyyy-MM-dd'));
+        formData.append('endDate', format(endDate, 'yyyy-MM-dd'));
+        formData.append('jobType', values.job_type);
+        formData.append('description', values.description);
+        formData.append('contactPerson', values.contact_person);
+        formData.append('contactPhone', values.contact_phone);
+        return formData;
+    }
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Hacer una Oferta a {guides.length} {guides.length === 1 ? 'Guía' : 'Guías'}</DialogTitle>
+                    <DialogTitle>{initialValues ? "Añadir a Oferta Existente" : `Hacer una Oferta a ${guides.length} ${guides.length === 1 ? 'Guía' : 'Guías'}`}</DialogTitle>
                     <DialogDescription>
                         Fechas seleccionadas: {format(startDate, "PPP", { locale: es })} - {format(endDate, "PPP", { locale: es })}
                     </DialogDescription>
@@ -350,6 +373,8 @@ function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: Guide, isO
 
 export default function SearchGuidesPage() {
     const { toast } = useToast();
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const [startDate, setStartDate] = React.useState<Date | undefined>();
     const [endDate, setEndDate] = React.useState<Date | undefined>();
     const [specialty, setSpecialty] = React.useState<string>('');
@@ -375,6 +400,30 @@ export default function SearchGuidesPage() {
 
     const [selectedGuideForRatings, setSelectedGuideForRatings] = React.useState<Guide | null>(null);
     const [isRatingDialogOpen, setIsRatingDialogOpen] = React.useState(false);
+
+    const [campaignDefaults, setCampaignDefaults] = React.useState<OfferFormValues | null>(null);
+
+    React.useEffect(() => {
+        const jobType = searchParams.get('job_type');
+        if (jobType !== null) {
+            const startDateParam = searchParams.get('start_date');
+            const endDateParam = searchParams.get('end_date');
+            if(startDateParam) setStartDate(parseISO(startDateParam));
+            if(endDateParam) setEndDate(parseISO(endDateParam));
+
+            setCampaignDefaults({
+                job_type: jobType,
+                description: searchParams.get('description') || '',
+                contact_person: searchParams.get('contact_person') || '',
+                contact_phone: searchParams.get('contact_phone') || '',
+            });
+
+            // Clean the URL
+            const newUrl = window.location.pathname;
+            window.history.replaceState({...window.history.state, as: newUrl, url: newUrl}, '', newUrl);
+
+        }
+    }, [searchParams]);
 
     React.useEffect(() => {
         async function performSubscriptionCheckAndFetchData() {
@@ -649,7 +698,7 @@ export default function SearchGuidesPage() {
                     </CardHeader>
                     <CardFooter>
                         <Button onClick={handleOfferClick} className="bg-accent text-accent-foreground hover:bg-accent/90">
-                            Crear Oferta para Seleccionados
+                            {campaignDefaults ? 'Añadir a Oferta Existente' : 'Crear Oferta para Seleccionados'}
                         </Button>
                          <Button variant="ghost" onClick={() => setSelectedGuides([])} className="ml-2">
                             Limpiar Selección
@@ -738,6 +787,7 @@ export default function SearchGuidesPage() {
                     endDate={endDate}
                     isOpen={isOfferDialogOpen}
                     onOpenChange={setIsOfferDialogOpen}
+                    initialValues={campaignDefaults}
                 />
             )}
 

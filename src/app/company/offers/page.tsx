@@ -2,7 +2,8 @@
 "use client";
 
 import React from "react";
-import { format, eachDayOfInterval, parseISO } from "date-fns";
+import Link from 'next/link';
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Loader2, Edit, Trash, User, UserPlus } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,11 +29,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
-import { updateOfferDetails, cancelPendingOffersForJob, addGuidesToOfferCampaign } from "@/app/actions/offers";
+import { updateOfferDetails, cancelPendingOffersForJob } from "@/app/actions/offers";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
-import type { Guide } from "@/lib/types";
 
 const supabase = createClient();
 
@@ -193,154 +191,6 @@ function EditOfferDialog({ campaign, isOpen, onOpenChange, onUpdated }: { campai
     );
 }
 
-function AddGuideDialog({ campaign, isOpen, onOpenChange, onAdded }: { campaign: OfferCampaign | null, isOpen: boolean, onOpenChange: (open: boolean) => void, onAdded: () => void }) {
-    const { toast } = useToast();
-    const [availableGuides, setAvailableGuides] = React.useState<Guide[]>([]);
-    const [filteredGuides, setFilteredGuides] = React.useState<Guide[]>([]);
-    const [selectedGuides, setSelectedGuides] = React.useState<string[]>([]);
-    const [searchTerm, setSearchTerm] = React.useState("");
-    const [isLoading, setIsLoading] = React.useState(true);
-    const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-    React.useEffect(() => {
-        if (!isOpen || !campaign) return;
-        
-        setIsLoading(true);
-        setSelectedGuides([]);
-        setSearchTerm("");
-
-        async function fetchAvailableGuides() {
-            try {
-                const [guidesRes, commitmentsRes] = await Promise.all([
-                    supabase.from('guides').select('*'),
-                    supabase.from('commitments').select('guide_id, start_date, end_date')
-                ]);
-
-                if (guidesRes.error) throw guidesRes.error;
-                if (commitmentsRes.error) throw commitmentsRes.error;
-
-                const offeredGuideIds = new Set(campaign!.offers.map(o => o.guide.id));
-                const guidesNotInCampaign = (guidesRes.data || []).filter(g => !offeredGuideIds.has(g.id));
-                
-                const requiredDates = eachDayOfInterval({ start: parseISO(campaign!.start_date), end: parseISO(campaign!.end_date) }).map(d => format(d, 'yyyy-MM-dd'));
-
-                const trulyAvailableGuides = guidesNotInCampaign.filter(guide => {
-                    const unavailableByChoice = new Set(guide.availability?.map(d => d.split('T')[0]) || []);
-                    if (requiredDates.some(d => unavailableByChoice.has(d))) return false;
-
-                    const guideCommitments = (commitmentsRes.data || []).filter(c => c.guide_id === guide.id);
-                    const isBooked = requiredDates.some(dateStr => {
-                        const checkDate = parseISO(dateStr);
-                        return guideCommitments.some(c => {
-                            return checkDate >= parseISO(c.start_date) && checkDate <= parseISO(c.end_date);
-                        });
-                    });
-                    return !isBooked;
-                });
-                
-                setAvailableGuides(trulyAvailableGuides as Guide[]);
-                setFilteredGuides(trulyAvailableGuides as Guide[]);
-
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-                toast({ title: "Error", description: `No se pudieron cargar los guías disponibles: ${errorMessage}`, variant: "destructive" });
-            } finally {
-                setIsLoading(false);
-            }
-        }
-        fetchAvailableGuides();
-
-    }, [isOpen, campaign, toast]);
-
-    React.useEffect(() => {
-        const lowerCaseSearch = searchTerm.toLowerCase();
-        const guides = availableGuides.filter(g => g.name?.toLowerCase().includes(lowerCaseSearch));
-        setFilteredGuides(guides);
-    }, [searchTerm, availableGuides]);
-
-    const handleSelectGuide = (guideId: string, isSelected: boolean) => {
-        setSelectedGuides(prev => isSelected ? [...prev, guideId] : prev.filter(id => id !== guideId));
-    };
-
-    const handleSubmit = async () => {
-        if (!campaign || selectedGuides.length === 0) return;
-        setIsSubmitting(true);
-        const result = await addGuidesToOfferCampaign({
-            guideIds: selectedGuides,
-            jobType: campaign.job_type || "",
-            description: campaign.description || "",
-            startDate: campaign.start_date,
-            endDate: campaign.end_date,
-            contactPerson: campaign.offers[0]?.contact_person || "",
-            contactPhone: campaign.offers[0]?.contact_phone || "",
-        });
-
-        if (result.success) {
-            toast({ title: "Éxito", description: result.message });
-            onAdded();
-            onOpenChange(false);
-        } else {
-            toast({ title: "Error", description: result.message, variant: "destructive" });
-        }
-        setIsSubmitting(false);
-    };
-
-    if (!campaign) return null;
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Añadir Guía a la Oferta</DialogTitle>
-                    <DialogDescription>
-                        Selecciona los guías disponibles que deseas añadir a la campaña "{campaign.job_type}".
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                    <Input 
-                        placeholder="Buscar guía por nombre..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <ScrollArea className="h-64 border rounded-md">
-                        <div className="p-4 space-y-4">
-                            {isLoading ? (
-                                <p className="text-center text-muted-foreground">Buscando guías disponibles...</p>
-                            ) : filteredGuides.length === 0 ? (
-                                <p className="text-center text-muted-foreground">No hay guías disponibles para estas fechas.</p>
-                            ) : (
-                                filteredGuides.map(guide => (
-                                    <div key={guide.id} className="flex items-center space-x-4">
-                                        <Checkbox 
-                                            id={`add-${guide.id}`}
-                                            onCheckedChange={(checked) => handleSelectGuide(guide.id, !!checked)}
-                                            checked={selectedGuides.includes(guide.id)}
-                                        />
-                                        <label htmlFor={`add-${guide.id}`} className="flex items-center gap-3 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
-                                            <Avatar className="h-9 w-9">
-                                                <AvatarImage src={guide.avatar ?? undefined} alt={guide.name ?? ''} />
-                                                <AvatarFallback>{guide.name?.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            <span>{guide.name}</span>
-                                        </label>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </ScrollArea>
-                </div>
-                <DialogFooter>
-                    <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
-                    <Button onClick={handleSubmit} disabled={isSubmitting || selectedGuides.length === 0}>
-                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Añadir {selectedGuides.length > 0 ? selectedGuides.length : ''} Guía(s)
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
 export default function ActiveOffersPage() {
     const { toast } = useToast();
     const [campaigns, setCampaigns] = React.useState<OfferCampaign[]>([]);
@@ -352,9 +202,6 @@ export default function ActiveOffersPage() {
     const [isCancelDialogOpen, setIsCancelDialogOpen] = React.useState(false);
     const [selectedCampaignForCancel, setSelectedCampaignForCancel] = React.useState<OfferCampaign | null>(null);
     const [isCanceling, setIsCanceling] = React.useState(false);
-
-    const [isAddGuideDialogOpen, setIsAddGuideDialogOpen] = React.useState(false);
-    const [selectedCampaignForAdd, setSelectedCampaignForAdd] = React.useState<OfferCampaign | null>(null);
 
     const fetchCampaigns = React.useCallback(async () => {
         setIsLoading(true);
@@ -434,11 +281,6 @@ export default function ActiveOffersPage() {
         setIsCancelDialogOpen(true);
     };
 
-    const handleAddGuideClick = (campaign: OfferCampaign) => {
-        setSelectedCampaignForAdd(campaign);
-        setIsAddGuideDialogOpen(true);
-    };
-
     const handleConfirmCancel = async () => {
         if (!selectedCampaignForCancel) return;
         setIsCanceling(true);
@@ -479,6 +321,16 @@ export default function ActiveOffersPage() {
                     ) : (
                         campaigns.map(campaign => {
                             const isCancelDisabled = campaign.hasAcceptedOffers;
+                            
+                            const params = new URLSearchParams();
+                            params.set('start_date', campaign.start_date);
+                            params.set('end_date', campaign.end_date);
+                            params.set('job_type', campaign.job_type || '');
+                            params.set('description', campaign.description || '');
+                            params.set('contact_person', campaign.offers[0]?.contact_person || '');
+                            params.set('contact_phone', campaign.offers[0]?.contact_phone || '');
+                            const href = `/company/search?${params.toString()}`;
+
                             return (
                                 <Card key={campaign.campaignId} className="bg-muted/30">
                                     <CardHeader>
@@ -490,10 +342,14 @@ export default function ActiveOffersPage() {
                                                 </CardDescription>
                                             </div>
                                             <div className="flex gap-2">
-                                                <Button variant="outline" size="icon" onClick={() => handleAddGuideClick(campaign)}>
-                                                    <UserPlus className="h-4 w-4" />
-                                                    <span className="sr-only">Añadir Guía</span>
-                                                </Button>
+                                                <Link href={href} passHref>
+                                                    <Button asChild variant="outline" size="icon">
+                                                        <span>
+                                                            <UserPlus className="h-4 w-4" />
+                                                            <span className="sr-only">Añadir Guía</span>
+                                                        </span>
+                                                    </Button>
+                                                </Link>
                                                 <Button variant="outline" size="icon" onClick={() => handleEditClick(campaign)}>
                                                     <Edit className="h-4 w-4" />
                                                     <span className="sr-only">Editar</span>
@@ -549,13 +405,6 @@ export default function ActiveOffersPage() {
                 isOpen={isEditDialogOpen}
                 onOpenChange={setIsEditDialogOpen}
                 onUpdated={fetchCampaigns}
-            />
-
-            <AddGuideDialog 
-                campaign={selectedCampaignForAdd}
-                isOpen={isAddGuideDialogOpen}
-                onOpenChange={setIsAddGuideDialogOpen}
-                onAdded={fetchCampaigns}
             />
 
             <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
