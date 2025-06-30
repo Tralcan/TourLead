@@ -2,7 +2,7 @@
 "use client";
 
 import React from "react";
-import { format, isPast } from "date-fns";
+import { format, isPast, eachDayOfInterval, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, DollarSign, User, Loader2, ShieldCheck } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -356,6 +356,7 @@ export default function SearchGuidesPage() {
     const [language, setLanguage] = React.useState<string>('');
     
     const [allGuides, setAllGuides] = React.useState<Guide[]>([]);
+    const [allCommitments, setAllCommitments] = React.useState<any[]>([]);
     const [filteredGuides, setFilteredGuides] = React.useState<Guide[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [isSearching, setIsSearching] = React.useState(false);
@@ -401,10 +402,11 @@ export default function SearchGuidesPage() {
                     setIsSubscribed(true);
                     setIsLoading(true);
                     
-                    const [guidesRes, specialtiesRes, languagesRes] = await Promise.all([
+                    const [guidesRes, specialtiesRes, languagesRes, commitmentsRes] = await Promise.all([
                         supabase.from('guides').select('*'),
                         supabase.from('expertise').select('name').eq('state', true),
-                        supabase.from('languaje').select('name')
+                        supabase.from('languaje').select('name'),
+                        supabase.from('commitments').select('guide_id, start_date, end_date').gte('end_date', today)
                     ]);
 
                     const { data: guidesData, error: guidesError } = guidesRes;
@@ -430,6 +432,13 @@ export default function SearchGuidesPage() {
                     if (languagesData) {
                         setLanguagesList(languagesData.map(l => l.name).filter(Boolean));
                     }
+
+                    const { data: commitmentsData, error: commitmentsError } = commitmentsRes;
+                    if (commitmentsError) throw new Error(`Error fetching commitments: ${commitmentsError.message}`);
+                    if (commitmentsData) {
+                        setAllCommitments(commitmentsData);
+                    }
+
                     setFilteredGuides([]);
                     setIsLoading(false);
                 } else {
@@ -462,23 +471,31 @@ export default function SearchGuidesPage() {
         }
 
         if (startDate && endDate) {
-            const requiredDates: string[] = [];
-            let currentDate = new Date(startDate);
-            while (currentDate <= endDate) {
-                requiredDates.push(format(currentDate, 'yyyy-MM-dd'));
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
+            const requiredDates = eachDayOfInterval({ start: startDate, end: endDate }).map(d => format(d, 'yyyy-MM-dd'));
 
             guides = guides.filter(guide => {
-                if (!guide.availability || guide.availability.length === 0) {
+                const unavailableByChoice = new Set(guide.availability?.map(d => d.split('T')[0]) || []);
+                
+                // Check against guide's self-marked unavailability
+                if (requiredDates.some(d => unavailableByChoice.has(d))) {
                     return false;
                 }
-                const availableDates = new Set(guide.availability.map(d => d.split('T')[0]));
-                for (const dateToCheck of requiredDates) {
-                    if (!availableDates.has(dateToCheck)) {
-                        return false;
-                    }
+                
+                // Check against commitments
+                const guideCommitments = allCommitments.filter(c => c.guide_id === guide.id);
+                const checkDateFallsInCommitment = requiredDates.some(dateStr => {
+                    const checkDate = parseISO(dateStr);
+                    return guideCommitments.some(c => {
+                        const commitmentStart = parseISO(c.start_date);
+                        const commitmentEnd = parseISO(c.end_date);
+                        return checkDate >= commitmentStart && checkDate <= commitmentEnd;
+                    });
+                });
+
+                if (checkDateFallsInCommitment) {
+                    return false;
                 }
+                
                 return true;
             });
         }
@@ -742,5 +759,3 @@ export default function SearchGuidesPage() {
         </div>
     );
 }
-
-    

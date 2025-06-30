@@ -32,7 +32,7 @@ export default function AvailabilityPage() {
   const today = startOfToday();
   const { toast } = useToast();
   const supabase = createClient();
-  const [days, setDays] = React.useState<Date[] | undefined>([]);
+  const [unavailableDays, setUnavailableDays] = React.useState<Date[] | undefined>([]);
   const [bookedDays, setBookedDays] = React.useState<Date[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
@@ -53,7 +53,7 @@ export default function AvailabilityPage() {
             .single();
 
         if (guideData?.availability) {
-            setDays(guideData.availability.map((d:string) => parseDateStringAsLocal(d)));
+            setUnavailableDays(guideData.availability.map((d:string) => parseDateStringAsLocal(d)));
         }
         if(guideError && guideError.code !== 'PGRST116') console.error("Error fetching availability:", guideError);
 
@@ -82,7 +82,7 @@ export default function AvailabilityPage() {
         return;
     }
 
-    const stringDates = days?.map(day => formatLocalDate(day));
+    const stringDates = unavailableDays?.map(day => formatLocalDate(day));
     
     const { error } = await supabase
       .from('guides')
@@ -108,16 +108,15 @@ export default function AvailabilityPage() {
         <CardHeader>
             <CardTitle>Gestiona tu Disponibilidad</CardTitle>
             <CardDescription>
-                Haz clic en los días para marcarlos como disponibles. Los días ya reservados aparecerán en gris y no se pueden modificar.
-                Guarda los cambios para que las empresas puedan encontrarte.
+                Por defecto, estás disponible todos los días. Haz clic en los días para marcarlos como **no disponibles**. Los días ya reservados por empresas aparecerán en gris y no se pueden modificar.
             </CardDescription>
         </CardHeader>
       <CardContent className="flex justify-center">
         {isLoading ? <p>Cargando calendario...</p> : (
         <Calendar
           mode="multiple"
-          selected={days}
-          onSelect={setDays}
+          selected={unavailableDays}
+          onSelect={setUnavailableDays}
           className="rounded-md border"
           numberOfMonths={2}
           locale={es}
@@ -140,11 +139,15 @@ export default function AvailabilityPage() {
         )}
       </CardContent>
       <CardFooter className="flex justify-between items-center border-t pt-6">
-        <Button onClick={handleSave} className="bg-accent text-accent-foreground hover:bg-accent/90">Guardar Disponibilidad</Button>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <Button onClick={handleSave} className="bg-accent text-accent-foreground hover:bg-accent/90">Guardar Cambios</Button>
+        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+                <div className="h-4 w-4 rounded-sm border" />
+                <span>Disponible</span>
+            </div>
             <div className="flex items-center gap-2">
                 <div className="h-4 w-4 rounded-sm bg-primary" />
-                <span>Disponible</span>
+                <span>No Disponible</span>
             </div>
             <div className="flex items-center gap-2">
                 <div className="h-4 w-4 rounded-sm bg-muted" />

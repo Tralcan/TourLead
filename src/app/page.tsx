@@ -5,16 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
 import { createClient } from '@/lib/supabase/server';
-import { eachDayOfInterval, format, parseISO, isBefore, startOfToday } from 'date-fns';
+import { eachDayOfInterval, format, parseISO, isBefore, startOfToday, addDays } from 'date-fns';
 
 export default async function Home() {
   const supabase = createClient();
   const today = startOfToday();
+  const searchHorizonDays = 365;
+  const searchEndDate = addDays(today, searchHorizonDays);
 
-  // Fetch guides with complete profiles
-  const { count: guideCount } = await supabase
+  // 1. Fetch guides with complete profiles
+  const { data: completeGuides, error: guidesError } = await supabase
     .from('guides')
-    .select('id', { count: 'exact', head: true })
+    .select('id, availability')
     .not('summary', 'is', null)
     .neq('summary', '')
     .not('specialties', 'is', null)
@@ -23,17 +25,18 @@ export default async function Home() {
     .neq('languages', '{}')
     .gt('rate', 0);
   
-  // Step 1: Fetch all commitments to build a set of unavailable person-days
+  const guideCount = completeGuides?.length ?? 0;
+  
+  // 2. Fetch all future commitments
   const { data: commitmentsData } = await supabase
     .from('commitments')
-    .select('guide_id, start_date, end_date');
+    .select('guide_id, start_date, end_date')
+    .gte('end_date', format(today, 'yyyy-MM-dd'));
 
-  // Step 2: Create a Set of all committed person-days for fast lookups.
-  // The key is a string: "guideId_YYYY-MM-DD"
+  // 3. Create a Set of all committed person-days for fast lookups.
   const committedPersonDays = new Set<string>();
   if (commitmentsData) {
       for (const commitment of commitmentsData) {
-          // Skip if data is incomplete
           if (!commitment.guide_id || !commitment.start_date || !commitment.end_date) continue;
           
           try {
@@ -43,7 +46,10 @@ export default async function Home() {
               });
 
               for (const day of daysInCommitment) {
-                  committedPersonDays.add(`${commitment.guide_id}_${format(day, 'yyyy-MM-dd')}`);
+                  // Only consider days within our search horizon
+                  if (!isBefore(day, today) && day <= searchEndDate) {
+                     committedPersonDays.add(`${commitment.guide_id}_${format(day, 'yyyy-MM-dd')}`);
+                  }
               }
           } catch(e) {
               console.error(`Invalid date range in commitment table: start=${commitment.start_date}, end=${commitment.end_date}`);
@@ -51,36 +57,35 @@ export default async function Home() {
       }
   }
 
-  // Step 3: Fetch all guides' availability
-  const { data: availabilityData } = await supabase
-    .from('guides')
-    .select('id, availability');
-
-  // Step 4: Calculate total net available person-days
+  // 4. Calculate total net available person-days based on the new logic
   let netAvailablePersonDays = 0;
-  if (availabilityData) {
-    for (const guide of availabilityData) {
-        if (guide.availability && Array.isArray(guide.availability)) {
-            for (const dayString of guide.availability) {
-                try {
-                    const day = parseISO(dayString);
-                    // Check 1: Is the day today or in the future?
-                    if (!isBefore(day, today)) {
-                        const formattedDay = format(day, 'yyyy-MM-dd');
-                        // Check 2: Is this specific guide committed on this specific day?
-                        if (!committedPersonDays.has(`${guide.id}_${formattedDay}`)) {
-                            netAvailablePersonDays++;
-                        }
-                    }
-                } catch(e) {
-                    // Ignore potential invalid date formats in the DB array.
-                }
+  if (completeGuides) {
+    const daysInHorizon = eachDayOfInterval({ start: today, end: searchEndDate });
+    
+    for (const guide of completeGuides) {
+        // Create a set of this guide's UNAVAILABLE dates for quick lookup
+        const unavailableByChoice = new Set<string>(guide.availability || []);
+        
+        for (const day of daysInHorizon) {
+            const dayString = format(day, 'yyyy-MM-dd');
+            
+            // Check if unavailable by choice
+            if (unavailableByChoice.has(dayString)) {
+                continue;
             }
+            
+            // Check if committed
+            if (committedPersonDays.has(`${guide.id}_${dayString}`)) {
+                continue;
+            }
+
+            // If neither, it's an available day
+            netAvailablePersonDays++;
         }
     }
   }
   
-  const displayGuideCount = guideCount ?? 0;
+  const displayGuideCount = guideCount;
   const displayTotalDays = netAvailablePersonDays;
 
   return (
