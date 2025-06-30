@@ -190,3 +190,36 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
 
     return { success: true, message: '¡Oferta Aceptada!' };
 }
+
+export async function cancelPendingOffersForJob(data: { jobType: string | null, startDate: string, endDate: string }) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { success: false, message: 'Autenticación requerida.' };
+    }
+
+    const { jobType, startDate, endDate } = data;
+
+    if (!jobType || !startDate || !endDate) {
+        return { success: false, message: 'Faltan datos para cancelar las ofertas.' };
+    }
+
+    const { error } = await supabase
+        .from('offers')
+        .update({ status: 'rejected' })
+        .match({
+            company_id: user.id,
+            job_type: jobType,
+            start_date: startDate,
+            end_date: endDate,
+            status: 'pending'
+        });
+
+    if (error) {
+        console.error("Error al cancelar ofertas pendientes:", error);
+        return { success: false, message: `No se pudieron cancelar las ofertas: ${error.message}` };
+    }
+
+    return { success: true, message: 'Ofertas pendientes canceladas exitosamente.' };
+}

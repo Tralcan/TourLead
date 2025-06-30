@@ -19,8 +19,20 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { History, ShieldCheck } from "lucide-react";
+import { History, ShieldCheck, Loader2 } from "lucide-react";
 import { StarRatingDisplay } from "@/components/star-rating";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { cancelPendingOffersForJob } from '@/app/actions/offers';
 
 const supabase = createClient();
 
@@ -69,6 +81,14 @@ type GuideStatus = {
     job_type: string | null;
     start_date: string;
     end_date: string;
+}
+
+type JobGroup = {
+    job_type: string | null;
+    start_date: string;
+    end_date: string;
+    guides: GuideStatus[];
+    hasPending: boolean;
 }
 
 function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: GuideInfo, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
@@ -134,77 +154,116 @@ function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: GuideInfo,
 
 export default function HiredGuidesPage() {
     const { toast } = useToast();
-    const [guidesList, setGuidesList] = React.useState<GuideStatus[]>([]);
+    const [jobs, setJobs] = React.useState<JobGroup[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [selectedGuide, setSelectedGuide] = React.useState<GuideInfo | null>(null);
     const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false);
 
-    React.useEffect(() => {
-        const fetchGuides = async () => {
-            setIsLoading(true);
-            const { data: { user } } = await supabase.auth.getUser();
+    const [isCanceling, setIsCanceling] = React.useState(false);
+    const [isCancelAlertOpen, setIsCancelAlertOpen] = React.useState(false);
+    const [selectedJobForCancel, setSelectedJobForCancel] = React.useState<JobGroup | null>(null);
 
-            if (!user) {
-                setIsLoading(false);
-                return;
-            }
+    const fetchGroupedJobs = React.useCallback(async () => {
+        setIsLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            setIsLoading(false);
+            return;
+        }
 
-            try {
-                const today = new Date().toISOString().split('T')[0];
+        try {
+            const today = new Date().toISOString().split('T')[0];
 
-                const [commitmentsRes, offersRes] = await Promise.all([
-                    supabase.from('commitments').select('id, job_type, start_date, end_date, guide:guides(*)').eq('company_id', user.id).gte('end_date', today),
-                    supabase.from('offers').select('id, job_type, start_date, end_date, guide:guides(*)').eq('company_id', user.id).eq('status', 'pending').gte('end_date', today)
-                ]);
-                
-                const { data: commitmentsData, error: commitmentsError } = commitmentsRes;
-                if (commitmentsError) throw new Error(`Error al cargar contrataciones: ${commitmentsError.message}`);
-                
-                const { data: offersData, error: offersError } = offersRes;
-                if (offersError) throw new Error(`Error al cargar ofertas: ${offersError.message}`);
-
-                const acceptedGuides: GuideStatus[] = await Promise.all((commitmentsData || []).map(async item => {
+            const [commitmentsRes, offersRes] = await Promise.all([
+                supabase.from('commitments').select('id, job_type, start_date, end_date, guide:guides(*)').eq('company_id', user.id).gte('end_date', today),
+                supabase.from('offers').select('id, job_type, start_date, end_date, guide:guides(*)').eq('company_id', user.id).eq('status', 'pending').gte('end_date', today)
+            ]);
+            
+            if (commitmentsRes.error) throw new Error(`Error al cargar contrataciones: ${commitmentsRes.error.message}`);
+            if (offersRes.error) throw new Error(`Error al cargar ofertas: ${offersRes.error.message}`);
+            
+            const allItems: (GuideStatus)[] = await Promise.all([
+                ...(commitmentsRes.data || []).map(async item => {
                     const guide = item.guide as GuideInfo;
                     const { rating, reviews } = await getGuideRating(guide.id);
                     return {
-                        id: item.id.toString(),
-                        status: 'Aceptado',
-                        job_type: item.job_type,
-                        start_date: item.start_date,
-                        end_date: item.end_date,
-                        guide: { ...guide, rating, reviews },
+                        id: item.id.toString(), status: 'Aceptado' as const, ...item, guide: { ...guide, rating, reviews },
                     };
-                }));
-
-                const pendingGuides: GuideStatus[] = await Promise.all((offersData || []).map(async item => {
+                }),
+                ...(offersRes.data || []).map(async item => {
                     const guide = item.guide as GuideInfo;
                     const { rating, reviews } = await getGuideRating(guide.id);
                     return {
-                        id: item.id.toString(),
-                        status: 'Pendiente',
+                        id: item.id.toString(), status: 'Pendiente' as const, ...item, guide: { ...guide, rating, reviews },
+                    };
+                }),
+            ].flat());
+
+            const grouped = allItems.reduce((acc, item) => {
+                const key = `${item.job_type}-${item.start_date}-${item.end_date}`;
+                if (!acc[key]) {
+                    acc[key] = {
                         job_type: item.job_type,
                         start_date: item.start_date,
                         end_date: item.end_date,
-                        guide: { ...guide, rating, reviews },
+                        guides: [],
+                        hasPending: false
                     };
-                }));
+                }
+                acc[key].guides.push(item);
+                if (item.status === 'Pendiente') {
+                    acc[key].hasPending = true;
+                }
+                return acc;
+            }, {} as Record<string, JobGroup>);
 
-                setGuidesList([...acceptedGuides, ...pendingGuides].sort((a,b) => new Date(a.start_date.replace(/-/g, '/')).getTime() - new Date(b.start_date.replace(/-/g, '/')).getTime()));
+            const groupedArray = Object.values(grouped).sort((a,b) => new Date(a.start_date.replace(/-/g, '/')).getTime() - new Date(b.start_date.replace(/-/g, '/')).getTime());
+            
+            setJobs(groupedArray);
 
-            } catch (error) {
-                console.error(error);
-                const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-                toast({ title: "Error", description: `No se pudieron cargar los datos: ${errorMessage}`, variant: "destructive" });
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchGuides();
-    }, [supabase, toast]);
+        } catch (error) {
+            console.error(error);
+            const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+            toast({ title: "Error", description: `No se pudieron cargar los datos: ${errorMessage}`, variant: "destructive" });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [toast]);
     
+    React.useEffect(() => {
+        fetchGroupedJobs();
+    }, [fetchGroupedJobs]);
+
     const handleViewProfile = (guide: GuideInfo) => {
         setSelectedGuide(guide);
         setIsProfileDialogOpen(true);
+    };
+
+    const handleOpenCancelDialog = (job: JobGroup) => {
+        setSelectedJobForCancel(job);
+        setIsCancelAlertOpen(true);
+    };
+
+    const handleConfirmCancel = async () => {
+        if (!selectedJobForCancel) return;
+        setIsCanceling(true);
+
+        const result = await cancelPendingOffersForJob({
+            jobType: selectedJobForCancel.job_type,
+            startDate: selectedJobForCancel.start_date,
+            endDate: selectedJobForCancel.end_date,
+        });
+
+        if (result.success) {
+            toast({ title: "Éxito", description: result.message });
+            fetchGroupedJobs(); // Refetch data to update the view
+        } else {
+            toast({ title: "Error", description: result.message, variant: "destructive" });
+        }
+
+        setIsCanceling(false);
+        setIsCancelAlertOpen(false);
+        setSelectedJobForCancel(null);
     };
 
     const renderContent = () => {
@@ -212,7 +271,7 @@ export default function HiredGuidesPage() {
             return <p className="text-center text-muted-foreground py-8">Cargando...</p>;
         }
 
-        if (guidesList.length === 0) {
+        if (jobs.length === 0) {
             return (
                 <p className="text-center text-muted-foreground py-8">
                     No tienes ofertas pendientes ni guías contratados para fechas futuras.
@@ -221,115 +280,141 @@ export default function HiredGuidesPage() {
         }
 
         return (
-            <>
-                {/* Mobile View */}
-                <div className="md:hidden space-y-4">
-                    {guidesList.map(item => (
-                        <Card key={`${item.status}-${item.id}`}>
-                             <CardHeader className="flex flex-row items-center gap-4">
-                                <Avatar className="w-12 h-12">
-                                    <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
-                                    <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div>
-                                    <CardTitle className="text-base">{item.guide.name}</CardTitle>
-                                    <CardDescription>
-                                        {item.status === 'Aceptado' && item.guide.phone ? item.guide.phone : 'Contacto no disponible'}
-                                    </CardDescription>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-2 text-sm">
-                                <div>
-                                    <span className="font-semibold">Trabajo: </span> {item.job_type}
-                                </div>
-                                <div>
-                                    <span className="font-semibold">Fechas: </span> 
-                                    {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
-                                </div>
-                                <div>
-                                    <span className="font-semibold">Estado: </span>
-                                    <Badge variant={item.status === 'Aceptado' ? 'default' : 'outline'}>{item.status}</Badge>
-                                </div>
-                            </CardContent>
-                             {item.status === 'Aceptado' && (
-                                <CardFooter>
-                                    <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)} className="w-full">
-                                        Ver Perfil
-                                    </Button>
-                                </CardFooter>
-                            )}
-                        </Card>
-                    ))}
-                </div>
-
-                {/* Desktop View */}
-                <div className="hidden md:block">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Guía</TableHead>
-                                <TableHead>Fechas</TableHead>
-                                <TableHead>Trabajo</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {guidesList.map(item => (
-                                <TableRow key={`${item.status}-${item.id}`}>
-                                    <TableCell>
-                                        <div className="flex items-center gap-4">
-                                            <Avatar>
+            <Accordion type="single" collapsible className="w-full">
+                {jobs.map((job, index) => (
+                    <AccordionItem value={`item-${index}`} key={index}>
+                        <AccordionTrigger>
+                            <div className="flex flex-col sm:flex-row sm:items-center text-left sm:gap-4">
+                                <span className="font-semibold text-base">{job.job_type || 'Trabajo sin título'}</span>
+                                <span className="text-sm text-muted-foreground">
+                                    {format(new Date(job.start_date.replace(/-/g, '/')), "d MMM yyyy", { locale: es })} - {format(new Date(job.end_date.replace(/-/g, '/')), "d MMM yyyy", { locale: es })}
+                                </span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <div className="md:hidden space-y-4">
+                                {job.guides.map(item => (
+                                    <Card key={`${item.status}-${item.id}`} className="w-full">
+                                        <CardHeader className="flex flex-row items-center gap-4">
+                                            <Avatar className="w-12 h-12">
                                                 <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
                                                 <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
                                             </Avatar>
                                             <div>
-                                                <div className="font-medium">{item.guide.name}</div>
-                                                {item.status === 'Aceptado' && item.guide.phone && (
-                                                    <div className="text-sm text-muted-foreground">{item.guide.phone}</div>
-                                                )}
+                                                <CardTitle className="text-base">{item.guide.name}</CardTitle>
+                                                <CardDescription>
+                                                    {item.status === 'Aceptado' && item.guide.phone ? item.guide.phone : 'Contacto no disponible'}
+                                                </CardDescription>
                                             </div>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        {format(new Date(item.start_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })} - {format(new Date(item.end_date.replace(/-/g, '/')), "d MMM, yyyy", { locale: es })}
-                                    </TableCell>
-                                    <TableCell>{item.job_type}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={item.status === 'Aceptado' ? 'default' : 'outline'}>{item.status}</Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">
+                                        </CardHeader>
+                                        <CardContent>
+                                            <Badge variant={item.status === 'Aceptado' ? 'default' : 'outline'} className="w-full justify-center">
+                                                {item.status}
+                                            </Badge>
+                                        </CardContent>
                                         {item.status === 'Aceptado' && (
-                                            <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)}>Ver Perfil</Button>
+                                            <CardFooter>
+                                                <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)} className="w-full">
+                                                    Ver Perfil
+                                                </Button>
+                                            </CardFooter>
                                         )}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-            </>
+                                    </Card>
+                                ))}
+                            </div>
+
+                            <div className="hidden md:block">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Guía</TableHead>
+                                            <TableHead>Estado</TableHead>
+                                            <TableHead className="text-right">Acciones</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {job.guides.map(item => (
+                                            <TableRow key={`${item.status}-${item.id}`}>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-4">
+                                                        <Avatar>
+                                                            <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
+                                                            <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
+                                                        </Avatar>
+                                                        <div>
+                                                            <div className="font-medium">{item.guide.name}</div>
+                                                            {item.status === 'Aceptado' && item.guide.phone && (
+                                                                <div className="text-sm text-muted-foreground">{item.guide.phone}</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant={item.status === 'Aceptado' ? 'default' : 'outline'}>{item.status}</Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {item.status === 'Aceptado' && (
+                                                        <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)}>Ver Perfil</Button>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                            
+                            {job.hasPending && (
+                                <div className="mt-4 border-t pt-4 flex justify-end">
+                                    <Button variant="destructive" onClick={() => handleOpenCancelDialog(job)}>
+                                        Cancelar Ofertas Pendientes
+                                    </Button>
+                                </div>
+                            )}
+                        </AccordionContent>
+                    </AccordionItem>
+                ))}
+            </Accordion>
         );
     };
 
     return (
-        <Card>
-            <CardHeader className="flex-row items-center justify-between">
-                <div>
-                    <CardTitle>Gestión de Guías</CardTitle>
-                    <CardDescription>Revisa el estado de tus ofertas y gestiona a los guías que has contratado.</CardDescription>
-                </div>
-                <Link href="/company/hired/history" passHref>
-                    <Button variant="outline">
-                        <History className="mr-2 h-4 w-4" />
-                        Ver Historial
-                    </Button>
-                </Link>
-            </CardHeader>
-            <CardContent>
-                {renderContent()}
-            </CardContent>
+        <>
+            <Card>
+                <CardHeader className="flex-row items-center justify-between">
+                    <div>
+                        <CardTitle>Gestión de Guías</CardTitle>
+                        <CardDescription>Revisa el estado de tus ofertas y gestiona a los guías que has contratado, agrupados por trabajo.</CardDescription>
+                    </div>
+                    <Link href="/company/hired/history" passHref>
+                        <Button variant="outline">
+                            <History className="mr-2 h-4 w-4" />
+                            Ver Historial
+                        </Button>
+                    </Link>
+                </CardHeader>
+                <CardContent>
+                    {renderContent()}
+                </CardContent>
+            </Card>
             {selectedGuide && <GuideProfileDialog guide={selectedGuide} isOpen={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen} />}
-        </Card>
+
+            <AlertDialog open={isCancelAlertOpen} onOpenChange={setIsCancelAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción cancelará todas las ofertas pendientes para el trabajo "{selectedJobForCancel?.job_type}". Los guías que no hayan respondido ya no podrán aceptar la oferta. Esta acción no se puede deshacer.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isCanceling}>No, mantener ofertas</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmCancel} disabled={isCanceling} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                            {isCanceling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Sí, cancelar ofertas
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 }
