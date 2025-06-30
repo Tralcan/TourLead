@@ -322,15 +322,23 @@ export async function rejectOffer(data: z.infer<typeof rejectOfferSchema>) {
     const { offerId } = parsed.data;
 
     // A company can reject an offer it has sent.
-    const { error } = await supabase
+    // We add .select() to get feedback on whether the row was actually updated.
+    const { data: updatedData, error } = await supabase
         .from('offers')
         .update({ status: 'rejected' })
         .eq('id', offerId)
-        .eq('company_id', user.id); // Security check to ensure the company owns the offer
+        .eq('company_id', user.id) // Security check to ensure the company owns the offer
+        .eq('status', 'pending')  // Extra check: only pending offers can be rejected this way
+        .select();
 
     if (error) {
         console.error("Error al rechazar la oferta:", error);
         return { success: false, message: 'No se pudo cancelar la oferta.' };
+    }
+
+    // If updatedData is empty, it means no row matched the criteria (or RLS blocked it).
+    if (!updatedData || updatedData.length === 0) {
+        return { success: false, message: 'No se pudo cancelar la oferta. Es posible que ya no estuviera pendiente o que no tengas permisos.' };
     }
 
     return { success: true, message: 'Oferta cancelada.' };
@@ -345,15 +353,21 @@ export async function guideRejectOffer(offerId: number) {
     }
 
     // A guide can reject an offer sent to them.
-    const { error } = await supabase
+    const { data: updatedData, error } = await supabase
         .from('offers')
         .update({ status: 'rejected' })
         .eq('id', offerId)
-        .eq('guide_id', user.id); // Security check to ensure the guide owns the offer
+        .eq('guide_id', user.id) // Security check to ensure the guide owns the offer
+        .eq('status', 'pending') // Extra check
+        .select();
 
     if (error) {
         console.error("Error al rechazar la oferta por el guía:", error);
         return { success: false, message: 'No se pudo rechazar la oferta.' };
+    }
+    
+    if (!updatedData || updatedData.length === 0) {
+        return { success: false, message: 'No se pudo rechazar la oferta. Es posible que ya no estuviera pendiente.' };
     }
 
     return { success: true, message: 'Oferta rechazada.' };
