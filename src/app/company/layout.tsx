@@ -1,8 +1,9 @@
+
 'use client'
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Building2, Search, Users, PanelLeft, UserCircle, Mountain, LogOut, Star, Shield } from 'lucide-react';
+import { Building2, Search, Users, PanelLeft, UserCircle, Mountain, LogOut, Star, Shield, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -12,8 +13,9 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Logo } from "@/components/logo";
 
 const baseNavItems = [
-    { href: '/company/hired', icon: Users, label: 'Guías Contratados' },
+    { href: '/company/hired', icon: Users, label: 'Gestión de Guías' },
     { href: '/company/search', icon: Search, label: 'Buscar Guías' },
+    { href: '/company/offers', icon: Mail, label: 'Ofertas Vigentes' },
     { href: '/company/reputation', icon: Star, label: 'Reputación' },
     { href: '/company/profile', icon: Building2, label: 'Perfil de la Empresa' },
 ];

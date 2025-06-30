@@ -223,3 +223,41 @@ export async function cancelPendingOffersForJob(data: { jobType: string | null, 
 
     return { success: true, message: 'Ofertas pendientes canceladas exitosamente.' };
 }
+
+const updateOfferSchema = z.object({
+  offerIds: z.array(z.number()),
+  jobType: z.string().min(1, "El tipo de trabajo es requerido."),
+  description: z.string().min(1, "La descripción es requerida."),
+});
+
+export async function updateOfferDetails(data: z.infer<typeof updateOfferSchema>) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { success: false, message: 'Autenticación requerida.' };
+    }
+
+    const parsed = updateOfferSchema.safeParse(data);
+    if (!parsed.success) {
+        return { success: false, message: `Datos de formulario inválidos: ${parsed.error.errors.map(e => e.message).join(', ')}` };
+    }
+
+    const { offerIds, jobType, description } = parsed.data;
+    
+    const { error } = await supabase
+      .from('offers')
+      .update({
+        job_type: jobType,
+        description: description,
+      })
+      .in('id', offerIds)
+      .eq('company_id', user.id); // Security check
+      
+    if (error) {
+        console.error("Error al actualizar la oferta:", error);
+        return { success: false, message: `No se pudo actualizar la oferta: ${error.message}` };
+    }
+
+    return { success: true, message: '¡Oferta actualizada exitosamente!' };
+}
