@@ -372,3 +372,85 @@ export async function guideRejectOffer(offerId: number) {
 
     return { success: true, message: 'Oferta rechazada.' };
 }
+
+const addGuidesSchema = z.object({
+    guideIds: z.array(z.string().uuid("ID de guía inválido.")).min(1, "Debe seleccionar al menos un guía."),
+    jobType: z.string().min(1),
+    description: z.string().min(1),
+    startDate: z.string().min(1),
+    endDate: z.string().min(1),
+    contactPerson: z.string().min(1),
+    contactPhone: z.string().min(1),
+});
+
+
+export async function addGuidesToOfferCampaign(data: z.infer<typeof addGuidesSchema>) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { success: false, message: 'Autenticación requerida. Por favor, inicie sesión.' };
+    }
+
+    const parsed = addGuidesSchema.safeParse(data);
+    if (!parsed.success) {
+        return { success: false, message: 'Datos inválidos para añadir guías.' };
+    }
+
+    const { guideIds, jobType, description, startDate, endDate, contactPerson, contactPhone } = parsed.data;
+    
+    const offersToInsert = guideIds.map(guideId => ({
+        guide_id: guideId,
+        company_id: user.id,
+        job_type: jobType,
+        description: description,
+        start_date: startDate,
+        end_date: endDate,
+        status: 'pending' as const,
+        contact_person: contactPerson,
+        contact_phone: contactPhone,
+    }));
+
+    const { error: insertError } = await supabase.from('offers').insert(offersToInsert);
+
+    if (insertError) {
+        console.error("Error al añadir guías a la campaña:", insertError);
+        return { success: false, message: 'No se pudo añadir los guías a la campaña.' };
+    }
+    
+    const { data: guidesData, error: guidesError } = await supabase
+        .from('guides')
+        .select('id, email, name')
+        .in('id', guideIds);
+
+    const { data: companyData, error: companyError } = await supabase
+        .from('companies')
+        .select('name')
+        .eq('id', user.id)
+        .single();
+    
+    if (guidesError || companyError || !guidesData || !companyData) {
+        console.error("Fallo al obtener datos para el email:", { guidesError, companyError });
+        return { success: true, message: 'Oferta(s) enviada(s), pero ocurrió un problema al notificar por correo.' };
+    }
+
+    const emailPromises = guidesData.map(guide => {
+        if (guide.email) {
+            return sendOfferEmail({
+                to: guide.email,
+                guideName: guide.name || 'Guía',
+                companyName: companyData.name || 'Una empresa',
+                jobType: jobType,
+                startDate: new Date(startDate.replace(/-/g, '/')),
+                endDate: new Date(endDate.replace(/-/g, '/')),
+                contactPerson: contactPerson,
+                contactPhone: contactPhone,
+            });
+        }
+        return Promise.resolve();
+    });
+
+    await Promise.allSettled(emailPromises);
+
+    return { success: true, message: '¡Guía(s) añadido(s) y notificado(s) exitosamente!' };
+}
