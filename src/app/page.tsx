@@ -5,18 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
 import { createClient } from '@/lib/supabase/server';
-import { eachDayOfInterval, format, parseISO, isBefore, startOfToday, addDays } from 'date-fns';
 
 export default async function Home() {
   const supabase = createClient();
-  const today = startOfToday();
-  const searchHorizonDays = 365;
-  const searchEndDate = addDays(today, searchHorizonDays);
-
-  // 1. Fetch guides with complete profiles
+  
+  // 1. Fetch guides with complete profiles to count them and their specialties
   const { data: completeGuides, error: guidesError } = await supabase
     .from('guides')
-    .select('id, availability')
+    .select('id, specialties')
     .not('summary', 'is', null)
     .neq('summary', '')
     .not('specialties', 'is', null)
@@ -27,66 +23,21 @@ export default async function Home() {
   
   const guideCount = completeGuides?.length ?? 0;
   
-  // 2. Fetch all future commitments
-  const { data: commitmentsData } = await supabase
-    .from('commitments')
-    .select('guide_id, start_date, end_date')
-    .gte('end_date', format(today, 'yyyy-MM-dd'));
-
-  // 3. Create a Set of all committed person-days for fast lookups.
-  const committedPersonDays = new Set<string>();
-  if (commitmentsData) {
-      for (const commitment of commitmentsData) {
-          if (!commitment.guide_id || !commitment.start_date || !commitment.end_date) continue;
-          
-          try {
-              const daysInCommitment = eachDayOfInterval({
-                  start: parseISO(commitment.start_date),
-                  end: parseISO(commitment.end_date)
-              });
-
-              for (const day of daysInCommitment) {
-                  // Only consider days within our search horizon
-                  if (!isBefore(day, today) && day <= searchEndDate) {
-                     committedPersonDays.add(`${commitment.guide_id}_${format(day, 'yyyy-MM-dd')}`);
-                  }
+  // 2. Calculate the number of distinct specialties from these guides
+  const allSpecialties = new Set<string>();
+  if (completeGuides) {
+      for (const guide of completeGuides) {
+          if (guide.specialties) {
+              for (const specialty of guide.specialties) {
+                  allSpecialties.add(specialty);
               }
-          } catch(e) {
-              console.error(`Invalid date range in commitment table: start=${commitment.start_date}, end=${commitment.end_date}`);
           }
       }
   }
-
-  // 4. Calculate total net available person-days based on the new logic
-  let netAvailablePersonDays = 0;
-  if (completeGuides) {
-    const daysInHorizon = eachDayOfInterval({ start: today, end: searchEndDate });
-    
-    for (const guide of completeGuides) {
-        // Create a set of this guide's UNAVAILABLE dates for quick lookup
-        const unavailableByChoice = new Set<string>(guide.availability || []);
-        
-        for (const day of daysInHorizon) {
-            const dayString = format(day, 'yyyy-MM-dd');
-            
-            // Check if unavailable by choice
-            if (unavailableByChoice.has(dayString)) {
-                continue;
-            }
-            
-            // Check if committed
-            if (committedPersonDays.has(`${guide.id}_${dayString}`)) {
-                continue;
-            }
-
-            // If neither, it's an available day
-            netAvailablePersonDays++;
-        }
-    }
-  }
+  const specialtyCount = allSpecialties.size;
   
   const displayGuideCount = guideCount;
-  const displayTotalDays = netAvailablePersonDays;
+  const displaySpecialtyCount = specialtyCount;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -110,7 +61,7 @@ export default async function Home() {
           </p>
           <div className="mt-6 max-w-3xl mx-auto">
             <p className="text-muted-foreground">
-              Explora una red de <strong className="text-foreground font-semibold">{displayGuideCount.toLocaleString('es-CL')} guías profesionales</strong> con más de <strong className="text-foreground font-semibold">{displayTotalDays.toLocaleString('es-CL')} días de disponibilidad combinada</strong>.
+              Explora una red de <strong className="text-foreground font-semibold">{displayGuideCount.toLocaleString('es-CL')} guías profesionales</strong> con más de <strong className="text-foreground font-semibold">{displaySpecialtyCount.toLocaleString('es-CL')} especialidades distintas</strong>.
             </p>
           </div>
           <div className="mt-8 flex justify-center gap-4">
