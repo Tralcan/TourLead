@@ -29,6 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
 import { updateOfferDetails, cancelPendingOffersForJob } from "@/app/actions/offers";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const supabase = createClient();
 
@@ -56,6 +57,7 @@ type OfferCampaign = {
     start_date: string;
     end_date: string;
     offers: Offer[];
+    hasAcceptedOffers: boolean;
 };
 
 const editOfferFormSchema = z.object({
@@ -233,8 +235,27 @@ export default function ActiveOffersPage() {
                     }
                     acc[key].offers.push(offer as Offer);
                     return acc;
-                }, {} as Record<string, OfferCampaign>);
-                setCampaigns(Object.values(grouped).sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()));
+                }, {} as Record<string, Omit<OfferCampaign, 'hasAcceptedOffers'>>);
+
+                const campaignsWithStatus = await Promise.all(Object.values(grouped).map(async (campaign) => {
+                    const { count, error: countError } = await supabase
+                        .from('offers')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('company_id', user.id)
+                        .eq('job_type', campaign.job_type!)
+                        .eq('start_date', campaign.start_date)
+                        .eq('end_date', campaign.end_date)
+                        .eq('status', 'accepted');
+                
+                    if (countError) {
+                        console.error("Error checking for accepted offers:", countError);
+                        return { ...campaign, hasAcceptedOffers: false }; // Safe default
+                    }
+                
+                    return { ...campaign, hasAcceptedOffers: (count ?? 0) > 0 };
+                }));
+
+                setCampaigns(campaignsWithStatus.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()));
             }
 
         } catch (error) {
@@ -297,45 +318,65 @@ export default function ActiveOffersPage() {
                     ) : campaigns.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">No tienes ofertas vigentes.</p>
                     ) : (
-                        campaigns.map(campaign => (
-                            <Card key={campaign.campaignId} className="bg-muted/30">
-                                <CardHeader>
-                                    <div className="flex justify-between items-start gap-4">
-                                        <div>
-                                            <CardTitle>{campaign.job_type}</CardTitle>
-                                            <CardDescription>
-                                                {format(new Date(campaign.start_date.replace(/-/g, '/')), "d MMM yyyy", { locale: es })} - {format(new Date(campaign.end_date.replace(/-/g, '/')), "d MMM yyyy", { locale: es })}
-                                            </CardDescription>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <Button variant="outline" size="icon" onClick={() => handleEditClick(campaign)}>
-                                                <Edit className="h-4 w-4" />
-                                                <span className="sr-only">Editar</span>
-                                            </Button>
-                                            <Button variant="destructive" size="icon" onClick={() => handleCancelClick(campaign)}>
-                                                <Trash className="h-4 w-4" />
-                                                <span className="sr-only">Cancelar</span>
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-sm text-muted-foreground mb-4">{campaign.description}</p>
-                                    <h4 className="font-semibold text-sm mb-2">Guías Ofertados ({campaign.offers.length}):</h4>
-                                    <div className="flex flex-wrap gap-4">
-                                        {campaign.offers.map(offer => (
-                                            <div key={offer.guide.id} className="flex items-center gap-2">
-                                                <Avatar className="h-8 w-8">
-                                                    <AvatarImage src={offer.guide.avatar ?? undefined} alt={offer.guide.name ?? ''} />
-                                                    <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
-                                                </Avatar>
-                                                <span className="text-sm">{offer.guide.name}</span>
+                        campaigns.map(campaign => {
+                            const isCancelDisabled = campaign.hasAcceptedOffers;
+                            return (
+                                <Card key={campaign.campaignId} className="bg-muted/30">
+                                    <CardHeader>
+                                        <div className="flex justify-between items-start gap-4">
+                                            <div>
+                                                <CardTitle>{campaign.job_type}</CardTitle>
+                                                <CardDescription>
+                                                    {format(new Date(campaign.start_date.replace(/-/g, '/')), "d MMM yyyy", { locale: es })} - {format(new Date(campaign.end_date.replace(/-/g, '/')), "d MMM yyyy", { locale: es })}
+                                                </CardDescription>
                                             </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))
+                                            <div className="flex gap-2">
+                                                <Button variant="outline" size="icon" onClick={() => handleEditClick(campaign)}>
+                                                    <Edit className="h-4 w-4" />
+                                                    <span className="sr-only">Editar</span>
+                                                </Button>
+
+                                                {isCancelDisabled ? (
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <span tabIndex={0}>
+                                                                <Button variant="destructive" size="icon" disabled>
+                                                                    <Trash className="h-4 w-4" />
+                                                                    <span className="sr-only">Cancelar</span>
+                                                                </Button>
+                                                            </span>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>No se puede cancelar porque al menos un guía ya aceptó esta oferta.</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                ) : (
+                                                    <Button variant="destructive" size="icon" onClick={() => handleCancelClick(campaign)}>
+                                                        <Trash className="h-4 w-4" />
+                                                        <span className="sr-only">Cancelar</span>
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-sm text-muted-foreground mb-4">{campaign.description}</p>
+                                        <h4 className="font-semibold text-sm mb-2">Guías Ofertados ({campaign.offers.length}):</h4>
+                                        <div className="flex flex-wrap gap-4">
+                                            {campaign.offers.map(offer => (
+                                                <div key={offer.guide.id} className="flex items-center gap-2">
+                                                    <Avatar className="h-8 w-8">
+                                                        <AvatarImage src={offer.guide.avatar ?? undefined} alt={offer.guide.name ?? ''} />
+                                                        <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="text-sm">{offer.guide.name}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })
                     )}
                 </CardContent>
             </Card>
