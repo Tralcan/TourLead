@@ -108,12 +108,22 @@ const acceptOfferSchema = z.object({
 
 export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
     const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { success: false, message: 'Autenticación requerida. Por favor, inicie sesión.' };
+    }
+
+    // Security check: ensure the user accepting is the one the offer was for.
+    if (user.id !== data.guideId) {
+        return { success: false, message: 'No tienes permiso para aceptar esta oferta.' };
+    }
     
     // Server-side availability check for overlapping commitments
     const { data: existingCommitments, error: commitmentError } = await supabase
         .from('commitments')
         .select('id')
-        .eq('guide_id', data.guideId)
+        .eq('guide_id', user.id) // Using server-side user.id
         .lte('start_date', data.endDate)
         .gte('end_date', data.startDate);
 
@@ -141,7 +151,7 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
     const { error: insertError } = await supabase
         .from('commitments')
         .insert({
-            guide_id: data.guideId,
+            guide_id: user.id, // Using server-side user.id
             company_id: data.companyId,
             job_type: data.jobType,
             start_date: data.startDate,
@@ -166,7 +176,7 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
     const { data: guideData, error: guideError } = await supabase
         .from('guides')
         .select('name')
-        .eq('id', data.guideId)
+        .eq('id', user.id) // Using server-side user.id
         .single();
 
     if (companyError || guideError || !companyData || !guideData || !companyData.email) {
