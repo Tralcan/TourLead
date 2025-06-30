@@ -44,6 +44,8 @@ type Offer = {
     description: string | null;
     start_date: string;
     end_date: string;
+    contact_person: string | null;
+    contact_phone: string | null;
     guide: GuideInfo;
 };
 
@@ -59,6 +61,8 @@ type OfferCampaign = {
 const editOfferFormSchema = z.object({
   jobType: z.string().min(1, "El tipo de trabajo es requerido."),
   description: z.string().min(1, "La descripción es requerida."),
+  contactPerson: z.string().min(1, "La persona de contacto es requerida."),
+  contactPhone: z.string().min(1, "El teléfono de contacto es requerido."),
 });
 
 type EditOfferFormValues = z.infer<typeof editOfferFormSchema>;
@@ -69,14 +73,17 @@ function EditOfferDialog({ campaign, isOpen, onOpenChange, onUpdated }: { campai
     
     const form = useForm<EditOfferFormValues>({
         resolver: zodResolver(editOfferFormSchema),
-        defaultValues: { jobType: "", description: "" }
+        defaultValues: { jobType: "", description: "", contactPerson: "", contactPhone: "" }
     });
     
     React.useEffect(() => {
         if (campaign) {
+            const firstOffer = campaign.offers[0];
             form.reset({
                 jobType: campaign.job_type ?? "",
                 description: campaign.description ?? "",
+                contactPerson: firstOffer?.contact_person ?? "",
+                contactPhone: firstOffer?.contact_phone ?? "",
             });
         }
     }, [campaign, form]);
@@ -90,6 +97,8 @@ function EditOfferDialog({ campaign, isOpen, onOpenChange, onUpdated }: { campai
             offerIds,
             jobType: values.jobType,
             description: values.description,
+            contactPerson: values.contactPerson,
+            contactPhone: values.contactPhone,
         });
 
         if (result.success) {
@@ -139,6 +148,32 @@ function EditOfferDialog({ campaign, isOpen, onOpenChange, onUpdated }: { campai
                                 </FormItem>
                             )}
                         />
+                        <FormField
+                            control={form.control}
+                            name="contactPerson"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Persona de Contacto</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="contactPhone"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Teléfono de Contacto</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                         <DialogFooter>
                             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
                             <Button type="submit" disabled={isSubmitting}>
@@ -176,7 +211,7 @@ export default function ActiveOffersPage() {
         try {
             const { data: offersData, error } = await supabase
                 .from('offers')
-                .select('id, job_type, description, start_date, end_date, guide:guides(id, name, avatar)')
+                .select('id, job_type, description, start_date, end_date, contact_person, contact_phone, guide:guides(id, name, avatar)')
                 .eq('company_id', user.id)
                 .eq('status', 'pending')
                 .gte('end_date', new Date().toISOString());
@@ -185,7 +220,7 @@ export default function ActiveOffersPage() {
             
             if (offersData) {
                 const grouped = offersData.reduce((acc, offer) => {
-                    const key = `${offer.job_type}-${offer.start_date}-${offer.end_date}-${offer.description}`;
+                    const key = `${offer.job_type}-${offer.start_date}-${offer.end_date}`;
                     if (!acc[key]) {
                         acc[key] = {
                             campaignId: key,

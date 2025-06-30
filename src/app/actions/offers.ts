@@ -228,6 +228,8 @@ const updateOfferSchema = z.object({
   offerIds: z.array(z.number()),
   jobType: z.string().min(1, "El tipo de trabajo es requerido."),
   description: z.string().min(1, "La descripción es requerida."),
+  contactPerson: z.string().min(1, "La persona de contacto es requerida."),
+  contactPhone: z.string().min(1, "El teléfono de contacto es requerido."),
 });
 
 export async function updateOfferDetails(data: z.infer<typeof updateOfferSchema>) {
@@ -243,13 +245,15 @@ export async function updateOfferDetails(data: z.infer<typeof updateOfferSchema>
         return { success: false, message: `Datos de formulario inválidos: ${parsed.error.errors.map(e => e.message).join(', ')}` };
     }
 
-    const { offerIds, jobType, description } = parsed.data;
+    const { offerIds, jobType, description, contactPerson, contactPhone } = parsed.data;
     
     const { error } = await supabase
       .from('offers')
       .update({
         job_type: jobType,
         description: description,
+        contact_person: contactPerson,
+        contact_phone: contactPhone,
       })
       .in('id', offerIds)
       .eq('company_id', user.id); // Security check
@@ -260,4 +264,37 @@ export async function updateOfferDetails(data: z.infer<typeof updateOfferSchema>
     }
 
     return { success: true, message: '¡Oferta actualizada exitosamente!' };
+}
+
+const rejectOfferSchema = z.object({
+    offerId: z.number(),
+});
+
+export async function rejectOffer(data: z.infer<typeof rejectOfferSchema>) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { success: false, message: 'Autenticación requerida.' };
+    }
+
+    const parsed = rejectOfferSchema.safeParse(data);
+    if (!parsed.success) {
+        return { success: false, message: 'ID de oferta inválido.' };
+    }
+
+    const { offerId } = parsed.data;
+
+    const { error } = await supabase
+        .from('offers')
+        .update({ status: 'rejected' })
+        .eq('id', offerId)
+        .eq('company_id', user.id); // Security check to ensure the company owns the offer
+
+    if (error) {
+        console.error("Error al rechazar la oferta:", error);
+        return { success: false, message: 'No se pudo cancelar la oferta.' };
+    }
+
+    return { success: true, message: 'Oferta cancelada.' };
 }

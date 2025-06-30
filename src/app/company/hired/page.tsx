@@ -32,7 +32,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cancelPendingOffersForJob } from '@/app/actions/offers';
+import { cancelPendingOffersForJob, rejectOffer } from '@/app/actions/offers';
 
 const supabase = createClient();
 
@@ -161,7 +161,9 @@ export default function HiredGuidesPage() {
 
     const [isCanceling, setIsCanceling] = React.useState(false);
     const [isCancelAlertOpen, setIsCancelAlertOpen] = React.useState(false);
+    const [isSingleCancelAlertOpen, setIsSingleCancelAlertOpen] = React.useState(false);
     const [selectedJobForCancel, setSelectedJobForCancel] = React.useState<JobGroup | null>(null);
+    const [selectedOfferForCancel, setSelectedOfferForCancel] = React.useState<GuideStatus | null>(null);
 
     const fetchGroupedJobs = React.useCallback(async () => {
         setIsLoading(true);
@@ -256,7 +258,7 @@ export default function HiredGuidesPage() {
 
         if (result.success) {
             toast({ title: "Éxito", description: result.message });
-            fetchGroupedJobs(); // Refetch data to update the view
+            fetchGroupedJobs();
         } else {
             toast({ title: "Error", description: result.message, variant: "destructive" });
         }
@@ -264,6 +266,29 @@ export default function HiredGuidesPage() {
         setIsCanceling(false);
         setIsCancelAlertOpen(false);
         setSelectedJobForCancel(null);
+    };
+
+    const handleOpenSingleCancelDialog = (offer: GuideStatus) => {
+        setSelectedOfferForCancel(offer);
+        setIsSingleCancelAlertOpen(true);
+    };
+
+    const handleConfirmSingleCancel = async () => {
+        if (!selectedOfferForCancel) return;
+        setIsCanceling(true);
+
+        const result = await rejectOffer({ offerId: parseInt(selectedOfferForCancel.id, 10) });
+
+        if (result.success) {
+            toast({ title: "Éxito", description: result.message });
+            fetchGroupedJobs();
+        } else {
+            toast({ title: "Error", description: result.message, variant: "destructive" });
+        }
+
+        setIsCanceling(false);
+        setIsSingleCancelAlertOpen(false);
+        setSelectedOfferForCancel(null);
     };
 
     const renderContent = () => {
@@ -312,13 +337,17 @@ export default function HiredGuidesPage() {
                                                 {item.status}
                                             </Badge>
                                         </CardContent>
-                                        {item.status === 'Aceptado' && (
-                                            <CardFooter>
+                                        <CardFooter>
+                                            {item.status === 'Aceptado' ? (
                                                 <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)} className="w-full">
                                                     Ver Perfil
                                                 </Button>
-                                            </CardFooter>
-                                        )}
+                                            ) : (
+                                                <Button variant="destructive" size="sm" onClick={() => handleOpenSingleCancelDialog(item)} className="w-full">
+                                                    Cancelar Oferta
+                                                </Button>
+                                            )}
+                                        </CardFooter>
                                     </Card>
                                 ))}
                             </div>
@@ -356,6 +385,9 @@ export default function HiredGuidesPage() {
                                                     {item.status === 'Aceptado' && (
                                                         <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)}>Ver Perfil</Button>
                                                     )}
+                                                     {item.status === 'Pendiente' && (
+                                                        <Button variant="destructive" size="sm" onClick={() => handleOpenSingleCancelDialog(item)}>Cancelar</Button>
+                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -366,7 +398,7 @@ export default function HiredGuidesPage() {
                             {job.hasPending && (
                                 <div className="mt-4 border-t pt-4 flex justify-end">
                                     <Button variant="destructive" onClick={() => handleOpenCancelDialog(job)}>
-                                        Cancelar Ofertas Pendientes
+                                        Cancelar Todas las Ofertas Pendientes
                                     </Button>
                                 </div>
                             )}
@@ -403,14 +435,32 @@ export default function HiredGuidesPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta acción cancelará todas las ofertas pendientes para el trabajo "{selectedJobForCancel?.job_type}". Los guías que no hayan respondido ya no podrán aceptar la oferta. Esta acción no se puede deshacer.
+                            Esta acción cancelará **todas** las ofertas pendientes para el trabajo "{selectedJobForCancel?.job_type}". Los guías que no hayan respondido ya no podrán aceptar la oferta. Esta acción no se puede deshacer.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isCanceling}>No, mantener ofertas</AlertDialogCancel>
                         <AlertDialogAction onClick={handleConfirmCancel} disabled={isCanceling} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
                             {isCanceling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Sí, cancelar ofertas
+                            Sí, cancelar todas
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            
+            <AlertDialog open={isSingleCancelAlertOpen} onOpenChange={setIsSingleCancelAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Cancelar esta oferta?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción cancelará la oferta pendiente enviada a <strong>{selectedOfferForCancel?.guide.name}</strong> para el trabajo "{selectedOfferForCancel?.job_type}". El guía ya no podrá aceptar la oferta.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isCanceling}>No, mantener oferta</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmSingleCancel} disabled={isCanceling} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                            {isCanceling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Sí, cancelar oferta
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
