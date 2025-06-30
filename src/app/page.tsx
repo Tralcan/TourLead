@@ -9,10 +9,10 @@ import { createClient } from '@/lib/supabase/server';
 export default async function Home() {
   const supabase = createClient();
   
-  // 1. Fetch guides with complete profiles to count them and their specialties
+  // 1. Fetch guides with complete profiles to count them, their specialties, and languages
   const { data: completeGuides, error: guidesError } = await supabase
     .from('guides')
-    .select('id, specialties')
+    .select('id, specialties, languages')
     .not('summary', 'is', null)
     .neq('summary', '')
     .not('specialties', 'is', null)
@@ -23,8 +23,9 @@ export default async function Home() {
   
   const guideCount = completeGuides?.length ?? 0;
   
-  // 2. Calculate the number of distinct specialties from these guides
+  // 2. Calculate the number of distinct specialties and languages from these guides
   const allSpecialties = new Set<string>();
+  const allLanguages = new Set<string>();
   if (completeGuides) {
       for (const guide of completeGuides) {
           if (guide.specialties) {
@@ -32,12 +33,19 @@ export default async function Home() {
                   allSpecialties.add(specialty);
               }
           }
+          if (guide.languages) {
+              for (const language of guide.languages) {
+                  allLanguages.add(language);
+              }
+          }
       }
   }
   const specialtyCount = allSpecialties.size;
+  const languageCount = allLanguages.size;
   
   const displayGuideCount = guideCount;
   const displaySpecialtyCount = specialtyCount;
+  const displayLanguageCount = languageCount;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -61,7 +69,7 @@ export default async function Home() {
           </p>
           <div className="mt-6 max-w-3xl mx-auto">
             <p className="text-muted-foreground">
-              Explora una red de <strong className="text-foreground font-semibold">{displayGuideCount.toLocaleString('es-CL')} guías profesionales</strong> con más de <strong className="text-foreground font-semibold">{displaySpecialtyCount.toLocaleString('es-CL')} especialidades distintas</strong>.
+              Explora una red de <strong className="text-foreground font-semibold">{displayGuideCount.toLocaleString('es-CL')} guías profesionales</strong> con más de <strong className="text-foreground font-semibold">{displaySpecialtyCount.toLocaleString('es-CL')} especialidades distintas</strong> y más de <strong className="text-foreground font-semibold">{displayLanguageCount.toLocaleString('es-CL')} idiomas</strong>.
             </p>
           </div>
           <div className="mt-8 flex justify-center gap-4">
