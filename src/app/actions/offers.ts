@@ -6,7 +6,7 @@ import { sendOfferEmail, sendAcceptanceNotificationEmail } from '@/services/emai
 import { z } from 'zod';
 
 const offerSchema = z.object({
-    guideId: z.string().uuid("ID de guía inválido."),
+    guideIds: z.array(z.string().uuid("ID de guía inválido.")).min(1, "Debe seleccionar al menos un guía."),
     jobType: z.string().min(1, "El tipo de trabajo es requerido."),
     description: z.string().min(1, "La descripción es requerida."),
     startDate: z.string().min(1, "La fecha de inicio es requerida."),
@@ -24,7 +24,7 @@ export async function createOffer(formData: FormData) {
     }
 
     const rawData = {
-        guideId: formData.get('guideId'),
+        guideIds: formData.getAll('guideId'),
         jobType: formData.get('jobType'),
         description: formData.get('description'),
         startDate: formData.get('startDate'),
@@ -39,30 +39,31 @@ export async function createOffer(formData: FormData) {
         return { success: false, message: `Datos de formulario inválidos: ${parsed.error.errors.map(e => e.message).join(', ')}` };
     }
 
-    const { guideId, jobType, description, startDate, endDate, contactPerson, contactPhone } = parsed.data;
+    const { guideIds, jobType, description, startDate, endDate, contactPerson, contactPhone } = parsed.data;
 
-    const { error: insertError } = await supabase.from('offers').insert({
+    const offersToInsert = guideIds.map(guideId => ({
         guide_id: guideId,
         company_id: user.id,
         job_type: jobType,
         description: description,
         start_date: startDate,
         end_date: endDate,
-        status: 'pending',
+        status: 'pending' as const,
         contact_person: contactPerson,
         contact_phone: contactPhone,
-    });
+    }));
+
+    const { error: insertError } = await supabase.from('offers').insert(offersToInsert);
 
     if (insertError) {
         console.error("Error al crear la oferta:", insertError);
         return { success: false, message: 'No se pudo crear la oferta en la base de datos.' };
     }
 
-    const { data: guideData, error: guideError } = await supabase
+    const { data: guidesData, error: guidesError } = await supabase
         .from('guides')
-        .select('email, name')
-        .eq('id', guideId)
-        .single();
+        .select('id, email, name')
+        .in('id', guideIds);
 
     const { data: companyData, error: companyError } = await supabase
         .from('companies')
@@ -70,28 +71,30 @@ export async function createOffer(formData: FormData) {
         .eq('id', user.id)
         .single();
     
-    if (guideError || companyError || !guideData || !companyData || !guideData.email) {
-        console.error("Fallo al obtener datos para el email:", { guideError, companyError });
-        return { success: true, message: 'Oferta creada, pero no se pudo enviar la notificación por correo.' };
+    if (guidesError || companyError || !guidesData || !companyData) {
+        console.error("Fallo al obtener datos para el email:", { guidesError, companyError });
+        return { success: true, message: 'Oferta(s) creada(s), pero no se pudo enviar la(s) notificación(es) por correo.' };
     }
 
-    try {
-        await sendOfferEmail({
-            to: guideData.email,
-            guideName: guideData.name || 'Guía',
-            companyName: companyData.name || 'Una empresa',
-            jobType: jobType,
-            startDate: new Date(startDate.replace(/-/g, '/')),
-            endDate: new Date(endDate.replace(/-/g, '/')),
-            contactPerson: contactPerson,
-            contactPhone: contactPhone,
-        });
-    } catch (emailError) {
-        console.error("Error al enviar el email:", emailError);
-        return { success: true, message: 'Oferta creada, pero falló el envío de la notificación por correo.' };
-    }
+    const emailPromises = guidesData.map(guide => {
+        if (guide.email) {
+            return sendOfferEmail({
+                to: guide.email,
+                guideName: guide.name || 'Guía',
+                companyName: companyData.name || 'Una empresa',
+                jobType: jobType,
+                startDate: new Date(startDate.replace(/-/g, '/')),
+                endDate: new Date(endDate.replace(/-/g, '/')),
+                contactPerson: contactPerson,
+                contactPhone: contactPhone,
+            });
+        }
+        return Promise.resolve();
+    });
 
-    return { success: true, message: '¡Oferta enviada exitosamente!' };
+    await Promise.allSettled(emailPromises);
+
+    return { success: true, message: '¡Oferta(s) enviada(s) exitosamente!' };
 }
 
 const acceptOfferSchema = z.object({

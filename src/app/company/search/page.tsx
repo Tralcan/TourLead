@@ -38,6 +38,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { createOffer } from "@/app/actions/offers";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 
 
 const supabase = createClient();
@@ -163,13 +164,13 @@ function RatingDetailsDialog({ guide, isOpen, onOpenChange }: { guide: Guide, is
 }
 
 function OfferDialog({ 
-    guide, 
+    guides, 
     startDate, 
     endDate, 
     isOpen, 
     onOpenChange 
 }: { 
-    guide: Guide, 
+    guides: Guide[], 
     startDate: Date, 
     endDate: Date, 
     isOpen: boolean, 
@@ -187,7 +188,9 @@ function OfferDialog({
         setIsSubmitting(true);
         
         const formData = new FormData();
-        formData.append('guideId', guide.id);
+        guides.forEach(guide => {
+            formData.append('guideId', guide.id);
+        });
         formData.append('startDate', format(startDate, 'yyyy-MM-dd'));
         formData.append('endDate', format(endDate, 'yyyy-MM-dd'));
         formData.append('jobType', values.job_type);
@@ -198,7 +201,7 @@ function OfferDialog({
         const result = await createOffer(formData);
         
         if (result.success) {
-            toast({ title: "¡Oferta Enviada!", description: `Tu oferta ha sido enviada a ${guide.name}.` });
+            toast({ title: "¡Oferta Enviada!", description: `Tu oferta ha sido enviada a ${guides.length} ${guides.length === 1 ? 'guía' : 'guías'}.` });
             router.push('/company/hired');
         } else {
             toast({ title: "Error", description: result.message, variant: "destructive" });
@@ -210,7 +213,7 @@ function OfferDialog({
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Hacer una Oferta a {guide.name}</DialogTitle>
+                    <DialogTitle>Hacer una Oferta a {guides.length} {guides.length === 1 ? 'Guía' : 'Guías'}</DialogTitle>
                     <DialogDescription>
                         Fechas seleccionadas: {format(startDate, "PPP", { locale: es })} - {format(endDate, "PPP", { locale: es })}
                     </DialogDescription>
@@ -363,7 +366,7 @@ export default function SearchGuidesPage() {
     const [isSubscribed, setIsSubscribed] = React.useState(false);
     const [isCheckingSubscription, setIsCheckingSubscription] = React.useState(true);
 
-    const [selectedGuide, setSelectedGuide] = React.useState<Guide | null>(null);
+    const [selectedGuides, setSelectedGuides] = React.useState<Guide[]>([]);
     const [isOfferDialogOpen, setIsOfferDialogOpen] = React.useState(false);
     
     const [selectedGuideForProfile, setSelectedGuideForProfile] = React.useState<Guide | null>(null);
@@ -446,6 +449,7 @@ export default function SearchGuidesPage() {
     const handleSearch = () => {
         setIsSearching(true);
         setHasSearched(true);
+        setSelectedGuides([]);
         
         let guides = [...allGuides];
 
@@ -488,12 +492,21 @@ export default function SearchGuidesPage() {
         setIsProfileDialogOpen(true);
     };
 
-    const handleOfferClick = (guide: Guide) => {
+    const handleSelectGuide = (guide: Guide, isSelected: boolean) => {
+        setSelectedGuides(prev => {
+            if (isSelected) {
+                return [...prev, guide];
+            } else {
+                return prev.filter(g => g.id !== guide.id);
+            }
+        });
+    };
+
+    const handleOfferClick = () => {
         if (!startDate || !endDate) {
             toast({ title: "Fechas Requeridas", description: "Por favor, selecciona una fecha de inicio y fin para hacer una oferta.", variant: "destructive" });
             return;
         }
-        setSelectedGuide(guide);
         setIsOfferDialogOpen(true);
     };
 
@@ -609,13 +622,41 @@ export default function SearchGuidesPage() {
                 </CardFooter>
             </Card>
 
+            {selectedGuides.length > 0 && (
+                <Card className="sticky bottom-4 z-10 shadow-lg mt-6 border-accent">
+                    <CardHeader className="pb-4">
+                        <CardTitle>Oferta Múltiple</CardTitle>
+                        <CardDescription>
+                            {`Has seleccionado ${selectedGuides.length} ${selectedGuides.length === 1 ? 'guía' : 'guías'}.`}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardFooter>
+                        <Button onClick={handleOfferClick} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                            Crear Oferta para Seleccionados
+                        </Button>
+                         <Button variant="ghost" onClick={() => setSelectedGuides([])} className="ml-2">
+                            Limpiar Selección
+                        </Button>
+                    </CardFooter>
+                </Card>
+            )}
+
             {isLoading ? (
                 <p className="text-center">Cargando guías...</p>
             ) : hasSearched ? (
                 filteredGuides.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredGuides.map(guide => (
-                            <Card key={guide.id} className="flex flex-col">
+                            <Card key={guide.id} className="flex flex-col relative">
+                                <div className="absolute top-2 right-2 z-10 bg-background/80 rounded-full">
+                                    <Checkbox
+                                        id={`select-guide-${guide.id}`}
+                                        aria-label={`Seleccionar ${guide.name}`}
+                                        onCheckedChange={(checked) => handleSelectGuide(guide, !!checked)}
+                                        checked={selectedGuides.some(g => g.id === guide.id)}
+                                        className="h-6 w-6"
+                                    />
+                                </div>
                                 <CardHeader className="flex flex-row items-center gap-4">
                                     <Avatar className="h-16 w-16">
                                         <AvatarImage src={guide.avatar ?? ''} alt={guide.name ?? ''} />
@@ -652,12 +693,9 @@ export default function SearchGuidesPage() {
                                         </button>
                                     </div>
                                 </CardContent>
-                                <CardFooter className="gap-2">
+                                <CardFooter>
                                     <Button variant="outline" className="w-full" onClick={() => handleViewProfile(guide)}>
                                         Ver Perfil
-                                    </Button>
-                                    <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => handleOfferClick(guide)}>
-                                        Ofertar
                                     </Button>
                                 </CardFooter>
                             </Card>
@@ -676,9 +714,9 @@ export default function SearchGuidesPage() {
                 </Card>
             )}
 
-            {selectedGuide && startDate && endDate && (
+            {isOfferDialogOpen && startDate && endDate && (
                 <OfferDialog
-                    guide={selectedGuide}
+                    guides={selectedGuides}
                     startDate={startDate}
                     endDate={endDate}
                     isOpen={isOfferDialogOpen}
