@@ -14,7 +14,7 @@ import { StarRatingDisplay } from "@/components/star-rating";
 import React from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
-import { acceptOffer } from '@/app/actions/offers';
+import { acceptOffer, guideRejectOffer } from '@/app/actions/offers';
 import { Badge } from "@/components/ui/badge";
 
 const supabase = createClient();
@@ -179,19 +179,16 @@ export default function OffersPage() {
     }
 
     const handleDecline = async (offer: JobOffer) => {
-        const { error } = await supabase
-            .from('offers')
-            .update({ status: 'rejected' })
-            .eq('id', offer.id);
+        const result = await guideRejectOffer(offer.id);
         
-        if(error) {
-            toast({ title: "Error", description: "No se pudo rechazar la oferta.", variant: "destructive" });
-        } else {
+        if(result.success) {
             toast({
                 title: "Oferta Rechazada",
                 description: `Has rechazado la oferta de ${offer.company.name}.`,
             });
              if(user) fetchOffers(user);
+        } else {
+            toast({ title: "Error", description: result.message, variant: "destructive" });
         }
     }
     

@@ -134,8 +134,27 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
         return { success: false, message: "No puedes aceptar esta oferta porque ya tienes un compromiso en esas fechas. Por favor, rechaza la oferta." };
     }
     
+    // Server-side validation of the offer before attempting to create a commitment
+    const { data: offerData, error: offerError } = await supabase
+        .from('offers')
+        .select('status, guide_id')
+        .eq('id', data.offerId)
+        .single();
+
+    if (offerError || !offerData) {
+        console.error("Error fetching offer to validate:", offerError);
+        return { success: false, message: `No se pudo encontrar la oferta para validarla: ${offerError?.message}` };
+    }
+
+    if (offerData.status !== 'pending') {
+        return { success: false, message: "Esta oferta ya no está pendiente. Puede que haya sido aceptada, rechazada o cancelada." };
+    }
+
+    if (offerData.guide_id !== user.id) {
+        return { success: false, message: "No tienes permiso para aceptar una oferta que no es tuya." };
+    }
+
     // 1. Create the commitment FIRST.
-    // The RLS policy on 'commitments' likely requires the corresponding offer to still be 'pending'.
     const { data: newCommitment, error: insertError } = await supabase
         .from('commitments')
         .insert({
@@ -151,6 +170,9 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
 
     if (insertError) {
         console.error("Error al crear compromiso:", insertError);
+        if (insertError.code === '42501') {
+             return { success: false, message: `No se pudo crear el compromiso debido a una política de seguridad de la base de datos. Por favor, contacta al administrador.` };
+        }
         return { success: false, message: `No se pudo crear el compromiso. La base de datos denegó la acción: ${insertError.message}` };
     }
     
@@ -167,7 +189,7 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
         if (newCommitment) {
             await supabase.from('commitments').delete().eq('id', newCommitment.id);
         }
-        return { success: false, message: "No se pudo aceptar la oferta. Por favor, inténtalo de nuevo más tarde." };
+        return { success: false, message: "No se pudo aceptar la oferta. Se revirtió el compromiso. Por favor, inténtalo de nuevo más tarde." };
     }
 
     // 3. Send notification email
@@ -299,6 +321,7 @@ export async function rejectOffer(data: z.infer<typeof rejectOfferSchema>) {
 
     const { offerId } = parsed.data;
 
+    // A company can reject an offer it has sent.
     const { error } = await supabase
         .from('offers')
         .update({ status: 'rejected' })
@@ -311,4 +334,27 @@ export async function rejectOffer(data: z.infer<typeof rejectOfferSchema>) {
     }
 
     return { success: true, message: 'Oferta cancelada.' };
+}
+
+export async function guideRejectOffer(offerId: number) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { success: false, message: 'Autenticación requerida.' };
+    }
+
+    // A guide can reject an offer sent to them.
+    const { error } = await supabase
+        .from('offers')
+        .update({ status: 'rejected' })
+        .eq('id', offerId)
+        .eq('guide_id', user.id); // Security check to ensure the guide owns the offer
+
+    if (error) {
+        console.error("Error al rechazar la oferta por el guía:", error);
+        return { success: false, message: 'No se pudo rechazar la oferta.' };
+    }
+
+    return { success: true, message: 'Oferta rechazada.' };
 }
