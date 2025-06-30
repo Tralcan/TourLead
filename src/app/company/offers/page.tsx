@@ -329,6 +329,8 @@ export default function ActiveOffersPage() {
                             params.set('description', campaign.description || '');
                             params.set('contact_person', campaign.offers[0]?.contact_person || '');
                             params.set('contact_phone', campaign.offers[0]?.contact_phone || '');
+                            const existingGuideIds = campaign.offers.map(o => o.guide.id).join(',');
+                            params.set('exclude_guides', existingGuideIds);
                             const href = `/company/search?${params.toString()}`;
 
                             return (

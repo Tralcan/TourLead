@@ -510,6 +510,12 @@ export default function SearchGuidesPage() {
         setSelectedGuides([]);
         
         let guides = [...allGuides];
+        
+        const excludedGuidesParam = searchParams.get('exclude_guides');
+        const excludedGuideIds = excludedGuidesParam ? excludedGuidesParam.split(',') : [];
+        if (excludedGuideIds.length > 0) {
+            guides = guides.filter(g => !excludedGuideIds.includes(g.id));
+        }
 
         if (specialty) {
             guides = guides.filter(g => g.specialties?.includes(specialty));
