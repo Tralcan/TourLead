@@ -114,16 +114,14 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
         return { success: false, message: 'Autenticación requerida. Por favor, inicie sesión.' };
     }
 
-    // Security check: ensure the user accepting is the one the offer was for.
     if (user.id !== data.guideId) {
         return { success: false, message: 'No tienes permiso para aceptar esta oferta.' };
     }
     
-    // Server-side availability check for overlapping commitments
     const { data: existingCommitments, error: commitmentError } = await supabase
         .from('commitments')
         .select('id')
-        .eq('guide_id', user.id) // Using server-side user.id
+        .eq('guide_id', user.id)
         .lte('start_date', data.endDate)
         .gte('end_date', data.startDate);
 
@@ -136,34 +134,40 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
         return { success: false, message: "No puedes aceptar esta oferta porque ya tienes un compromiso en esas fechas. Por favor, rechaza la oferta." };
     }
     
-    // 1. Update offer status
-    const { error: updateError } = await supabase
-        .from('offers')
-        .update({ status: 'accepted' })
-        .eq('id', data.offerId);
-
-    if (updateError) {
-        console.error("Error al aceptar la oferta:", updateError);
-        return { success: false, message: "No se pudo aceptar la oferta." };
-    }
-
-    // 2. Create commitment, now including the offer_id
-    const { error: insertError } = await supabase
+    // 1. Create the commitment FIRST.
+    // The RLS policy on 'commitments' likely requires the corresponding offer to still be 'pending'.
+    const { data: newCommitment, error: insertError } = await supabase
         .from('commitments')
         .insert({
-            guide_id: user.id, // Using server-side user.id
+            guide_id: user.id,
             company_id: data.companyId,
             job_type: data.jobType,
             start_date: data.startDate,
             end_date: data.endDate,
             offer_id: data.offerId,
-        });
-    
+        })
+        .select('id')
+        .single();
+
     if (insertError) {
         console.error("Error al crear compromiso:", insertError);
-        // Rollback offer status if commitment creation fails
-        await supabase.from('offers').update({ status: 'pending' }).eq('id', data.offerId);
-        return { success: false, message: "No se pudo crear el compromiso." };
+        return { success: false, message: `No se pudo crear el compromiso. La base de datos denegó la acción: ${insertError.message}` };
+    }
+    
+    // 2. Update offer status to 'accepted'.
+    const { error: updateError } = await supabase
+        .from('offers')
+        .update({ status: 'accepted' })
+        .eq('id', data.offerId)
+        .eq('guide_id', user.id); // Security check
+
+    if (updateError) {
+        console.error("Error al actualizar la oferta:", updateError);
+        // If the offer update fails, we must try to delete the commitment we just created.
+        if (newCommitment) {
+            await supabase.from('commitments').delete().eq('id', newCommitment.id);
+        }
+        return { success: false, message: "No se pudo aceptar la oferta. Por favor, inténtalo de nuevo más tarde." };
     }
 
     // 3. Send notification email
@@ -176,7 +180,7 @@ export async function acceptOffer(data: z.infer<typeof acceptOfferSchema>) {
     const { data: guideData, error: guideError } = await supabase
         .from('guides')
         .select('name')
-        .eq('id', user.id) // Using server-side user.id
+        .eq('id', user.id)
         .single();
 
     if (companyError || guideError || !companyData || !guideData || !companyData.email) {
