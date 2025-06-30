@@ -2,7 +2,7 @@
 "use client";
 
 import React from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { StarRatingDisplay } from "@/components/star-rating";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
