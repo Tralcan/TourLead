@@ -10,29 +10,18 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { format } from "date-fns";
+import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ShieldCheck, Loader2 } from "lucide-react";
+import { ShieldCheck, History } from "lucide-react";
 import { StarRatingDisplay } from "@/components/star-rating";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { cancelPendingOffersForJob, rejectOffer } from '@/app/actions/offers';
+import { Badge } from "@/components/ui/badge";
 
 const supabase = createClient();
 
@@ -74,9 +63,8 @@ type GuideInfo = {
     is_certified?: boolean | null;
 }
 
-type GuideStatus = {
-    id: string; // commitment or offer id
-    status: 'Aceptado' | 'Pendiente';
+type Commitment = {
+    id: string;
     guide: GuideInfo;
     job_type: string | null;
     start_date: string;
@@ -87,8 +75,7 @@ type JobGroup = {
     job_type: string | null;
     start_date: string;
     end_date: string;
-    guides: GuideStatus[];
-    hasPending: boolean;
+    guides: Commitment[];
 }
 
 function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: GuideInfo, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
@@ -159,12 +146,6 @@ export default function HiredGuidesPage() {
     const [selectedGuide, setSelectedGuide] = React.useState<GuideInfo | null>(null);
     const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false);
 
-    const [isCanceling, setIsCanceling] = React.useState(false);
-    const [isCancelAlertOpen, setIsCancelAlertOpen] = React.useState(false);
-    const [isSingleCancelAlertOpen, setIsSingleCancelAlertOpen] = React.useState(false);
-    const [selectedJobForCancel, setSelectedJobForCancel] = React.useState<JobGroup | null>(null);
-    const [selectedOfferForCancel, setSelectedOfferForCancel] = React.useState<GuideStatus | null>(null);
-
     const fetchGroupedJobs = React.useCallback(async () => {
         setIsLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
@@ -176,30 +157,27 @@ export default function HiredGuidesPage() {
         try {
             const today = new Date().toISOString().split('T')[0];
 
-            const [commitmentsRes, offersRes] = await Promise.all([
-                supabase.from('commitments').select('id, job_type, start_date, end_date, guide:guides(*)').eq('company_id', user.id).gte('end_date', today),
-                supabase.from('offers').select('id, job_type, start_date, end_date, guide:guides(*)').eq('company_id', user.id).eq('status', 'pending').gte('end_date', today)
-            ]);
+            const { error: commitmentsError, data: commitmentsData } = await supabase
+                .from('commitments')
+                .select('id, job_type, start_date, end_date, guide:guides(*)')
+                .eq('company_id', user.id)
+                .gte('end_date', today);
             
-            if (commitmentsRes.error) throw new Error(`Error al cargar contrataciones: ${commitmentsRes.error.message}`);
-            if (offersRes.error) throw new Error(`Error al cargar ofertas: ${offersRes.error.message}`);
+            if (commitmentsError) throw new Error(`Error al cargar contrataciones: ${commitmentsError.message}`);
             
-            const allItems: (GuideStatus)[] = await Promise.all([
-                ...(commitmentsRes.data || []).map(async item => {
+            const allItems: (Commitment)[] = await Promise.all(
+                (commitmentsData || []).map(async item => {
                     const guide = item.guide as GuideInfo;
                     const { rating, reviews } = await getGuideRating(guide.id);
                     return {
-                        id: item.id.toString(), status: 'Aceptado' as const, ...item, guide: { ...guide, rating, reviews },
+                        id: item.id.toString(),
+                        job_type: item.job_type,
+                        start_date: item.start_date,
+                        end_date: item.end_date,
+                        guide: { ...guide, rating, reviews },
                     };
-                }),
-                ...(offersRes.data || []).map(async item => {
-                    const guide = item.guide as GuideInfo;
-                    const { rating, reviews } = await getGuideRating(guide.id);
-                    return {
-                        id: item.id.toString(), status: 'Pendiente' as const, ...item, guide: { ...guide, rating, reviews },
-                    };
-                }),
-            ].flat());
+                })
+            );
 
             const grouped = allItems.reduce((acc, item) => {
                 const key = `${item.job_type}-${item.start_date}-${item.end_date}`;
@@ -209,13 +187,9 @@ export default function HiredGuidesPage() {
                         start_date: item.start_date,
                         end_date: item.end_date,
                         guides: [],
-                        hasPending: false
                     };
                 }
                 acc[key].guides.push(item);
-                if (item.status === 'Pendiente') {
-                    acc[key].hasPending = true;
-                }
                 return acc;
             }, {} as Record<string, JobGroup>);
 
@@ -241,55 +215,9 @@ export default function HiredGuidesPage() {
         setIsProfileDialogOpen(true);
     };
 
-    const handleOpenCancelDialog = (job: JobGroup) => {
-        setSelectedJobForCancel(job);
-        setIsCancelAlertOpen(true);
-    };
-
-    const handleConfirmCancel = async () => {
-        if (!selectedJobForCancel) return;
-        setIsCanceling(true);
-
-        const result = await cancelPendingOffersForJob({
-            jobType: selectedJobForCancel.job_type,
-            startDate: selectedJobForCancel.start_date,
-            endDate: selectedJobForCancel.end_date,
-        });
-
-        if (result.success) {
-            toast({ title: "Éxito", description: result.message });
-            fetchGroupedJobs();
-        } else {
-            toast({ title: "Error", description: result.message, variant: "destructive" });
-        }
-
-        setIsCanceling(false);
-        setIsCancelAlertOpen(false);
-        setSelectedJobForCancel(null);
-    };
-
-    const handleOpenSingleCancelDialog = (offer: GuideStatus) => {
-        setSelectedOfferForCancel(offer);
-        setIsSingleCancelAlertOpen(true);
-    };
-
-    const handleConfirmSingleCancel = async () => {
-        if (!selectedOfferForCancel) return;
-        setIsCanceling(true);
-
-        const result = await rejectOffer({ offerId: parseInt(selectedOfferForCancel.id, 10) });
-
-        if (result.success) {
-            toast({ title: "Éxito", description: result.message });
-            fetchGroupedJobs();
-        } else {
-            toast({ title: "Error", description: result.message, variant: "destructive" });
-        }
-
-        setIsCanceling(false);
-        setIsSingleCancelAlertOpen(false);
-        setSelectedOfferForCancel(null);
-    };
+    const calculateDays = (start: string, end: string) => {
+        return differenceInDays(parseISO(end), parseISO(start)) + 1;
+    }
 
     const renderContent = () => {
         if (isLoading) {
@@ -299,7 +227,7 @@ export default function HiredGuidesPage() {
         if (jobs.length === 0) {
             return (
                 <p className="text-center text-muted-foreground py-8">
-                    No tienes ofertas pendientes ni guías contratados para fechas futuras.
+                    No tienes guías contratados para fechas futuras.
                 </p>
             );
         }
@@ -317,91 +245,81 @@ export default function HiredGuidesPage() {
                             </div>
                         </AccordionTrigger>
                         <AccordionContent>
+                            {/* Mobile View */}
                             <div className="md:hidden space-y-4">
-                                {job.guides.map(item => (
-                                    <Card key={`${item.status}-${item.id}`} className="w-full">
-                                        <CardHeader className="flex flex-row items-center gap-4">
-                                            <Avatar className="w-12 h-12">
-                                                <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
-                                                <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                                <CardTitle className="text-base">{item.guide.name}</CardTitle>
-                                                <CardDescription>
-                                                    {item.status === 'Aceptado' && item.guide.phone ? item.guide.phone : 'Contacto no disponible'}
-                                                </CardDescription>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <Badge variant={item.status === 'Aceptado' ? 'default' : 'outline'} className="w-full justify-center">
-                                                {item.status}
-                                            </Badge>
-                                        </CardContent>
-                                        <CardFooter>
-                                            {item.status === 'Aceptado' ? (
+                                {job.guides.map(item => {
+                                    const days = calculateDays(item.start_date, item.end_date);
+                                    const totalPay = days * (item.guide.rate || 0);
+                                    return (
+                                        <Card key={item.id} className="w-full">
+                                            <CardHeader className="flex flex-row items-center gap-4">
+                                                <Avatar className="w-12 h-12">
+                                                    <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
+                                                    <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
+                                                </Avatar>
+                                                <div>
+                                                    <CardTitle className="text-base">{item.guide.name}</CardTitle>
+                                                    <CardDescription>
+                                                        <StarRatingDisplay rating={item.guide.rating ?? 0} reviews={item.guide.reviews}/>
+                                                    </CardDescription>
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent className="space-y-2 text-sm">
+                                                <div><span className="font-semibold">Días contratado:</span> {days}</div>
+                                                <div><span className="font-semibold">Total a pagar:</span> ${totalPay.toLocaleString('es-CL')}</div>
+                                            </CardContent>
+                                            <CardFooter>
                                                 <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)} className="w-full">
                                                     Ver Perfil
                                                 </Button>
-                                            ) : (
-                                                <Button variant="destructive" size="sm" onClick={() => handleOpenSingleCancelDialog(item)} className="w-full">
-                                                    Cancelar Oferta
-                                                </Button>
-                                            )}
-                                        </CardFooter>
-                                    </Card>
-                                ))}
+                                            </CardFooter>
+                                        </Card>
+                                    );
+                                })}
                             </div>
 
+                            {/* Desktop View */}
                             <div className="hidden md:block">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Guía</TableHead>
-                                            <TableHead>Estado</TableHead>
-                                            <TableHead className="text-right">Acciones</TableHead>
+                                            <TableHead>Valoraciones</TableHead>
+                                            <TableHead>Días Contratado</TableHead>
+                                            <TableHead className="text-right">Total a Pagar</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {job.guides.map(item => (
-                                            <TableRow key={`${item.status}-${item.id}`}>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-4">
-                                                        <Avatar>
-                                                            <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
-                                                            <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
-                                                        </Avatar>
-                                                        <div>
-                                                            <div className="font-medium">{item.guide.name}</div>
-                                                            {item.status === 'Aceptado' && item.guide.phone && (
+                                        {job.guides.map(item => {
+                                            const days = calculateDays(item.start_date, item.end_date);
+                                            const totalPay = days * (item.guide.rate || 0);
+                                            return (
+                                                <TableRow key={item.id}>
+                                                    <TableCell>
+                                                        <button className="flex items-center gap-4 text-left p-0 bg-transparent border-none cursor-pointer hover:opacity-80 transition-opacity" onClick={() => handleViewProfile(item.guide)}>
+                                                            <Avatar>
+                                                                <AvatarImage src={item.guide.avatar ?? ''} alt={item.guide.name ?? ''} />
+                                                                <AvatarFallback>{item.guide.name?.charAt(0)}</AvatarFallback>
+                                                            </Avatar>
+                                                            <div>
+                                                                <div className="font-medium">{item.guide.name}</div>
                                                                 <div className="text-sm text-muted-foreground">{item.guide.phone}</div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant={item.status === 'Aceptado' ? 'default' : 'outline'}>{item.status}</Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {item.status === 'Aceptado' && (
-                                                        <Button variant="outline" size="sm" onClick={() => handleViewProfile(item.guide)}>Ver Perfil</Button>
-                                                    )}
-                                                     {item.status === 'Pendiente' && (
-                                                        <Button variant="destructive" size="sm" onClick={() => handleOpenSingleCancelDialog(item)}>Cancelar</Button>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                                            </div>
+                                                        </button>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <StarRatingDisplay rating={item.guide.rating ?? 0} reviews={item.guide.reviews}/>
+                                                    </TableCell>
+                                                    <TableCell>{days}</TableCell>
+                                                    <TableCell className="text-right font-medium">
+                                                        ${totalPay.toLocaleString('es-CL')}
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
                                     </TableBody>
                                 </Table>
                             </div>
-                            
-                            {job.hasPending && (
-                                <div className="mt-4 border-t pt-4 flex justify-end">
-                                    <Button variant="destructive" onClick={() => handleOpenCancelDialog(job)}>
-                                        Cancelar Todas las Ofertas Pendientes
-                                    </Button>
-                                </div>
-                            )}
                         </AccordionContent>
                     </AccordionItem>
                 ))}
@@ -412,51 +330,23 @@ export default function HiredGuidesPage() {
     return (
         <>
             <Card>
-                <CardHeader>
-                    <CardTitle>Gestión de Guías</CardTitle>
-                    <CardDescription>Revisa el estado de tus ofertas y gestiona a los guías que has contratado, agrupados por trabajo.</CardDescription>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <CardTitle>Gestión de Guías Contratados</CardTitle>
+                        <CardDescription>Revisa tus compromisos vigentes y futuros, agrupados por trabajo.</CardDescription>
+                    </div>
+                     <Button variant="outline" asChild>
+                        <Link href="/company/hired/history">
+                            <History className="mr-2 h-4 w-4" />
+                            Ver Historial
+                        </Link>
+                    </Button>
                 </CardHeader>
                 <CardContent>
                     {renderContent()}
                 </CardContent>
             </Card>
             {selectedGuide && <GuideProfileDialog guide={selectedGuide} isOpen={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen} />}
-
-            <AlertDialog open={isCancelAlertOpen} onOpenChange={setIsCancelAlertOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Esta acción cancelará **todas** las ofertas pendientes para el trabajo "{selectedJobForCancel?.job_type}". Los guías que no hayan respondido ya no podrán aceptar la oferta. Esta acción no se puede deshacer.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isCanceling}>No, mantener ofertas</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleConfirmCancel} disabled={isCanceling} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                            {isCanceling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Sí, cancelar todas
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-            
-            <AlertDialog open={isSingleCancelAlertOpen} onOpenChange={setIsSingleCancelAlertOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>¿Cancelar esta oferta?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Esta acción cancelará la oferta pendiente enviada a <strong>{selectedOfferForCancel?.guide.name}</strong> para el trabajo "{selectedOfferForCancel?.job_type}". El guía ya no podrá aceptar la oferta.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isCanceling}>No, mantener oferta</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleConfirmSingleCancel} disabled={isCanceling} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                            {isCanceling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Sí, cancelar oferta
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </>
     );
 }
