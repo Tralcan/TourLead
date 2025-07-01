@@ -240,7 +240,7 @@ export default function HiredHistoryPage() {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto pt-4 sm:pt-0">
                     <Button variant="outline" asChild>
-                        <Link href="/company/hired">
+                        <Link href="/company/offers">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Volver
                         </Link>
