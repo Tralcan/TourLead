@@ -2,7 +2,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { sendOfferEmail, sendAcceptanceNotificationEmail } from '@/services/email';
+import { sendOfferEmail, sendAcceptanceNotificationEmail, sendOfferReminderEmail } from '@/services/email';
 import { z } from 'zod';
 
 const offerSchema = z.object({
@@ -453,4 +453,64 @@ export async function addGuidesToOfferCampaign(data: z.infer<typeof addGuidesSch
     await Promise.allSettled(emailPromises);
 
     return { success: true, message: '¡Guía(s) añadido(s) y notificado(s) exitosamente!' };
+}
+
+const remindOfferSchema = z.object({
+    offerId: z.number(),
+});
+
+export async function remindOffer(data: z.infer<typeof remindOfferSchema>) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { success: false, message: 'Autenticación requerida.' };
+    }
+
+    const parsed = remindOfferSchema.safeParse(data);
+    if (!parsed.success) {
+        return { success: false, message: 'ID de oferta inválido.' };
+    }
+    const { offerId } = parsed.data;
+
+    // Fetch all necessary details for the email in one go
+    const { data: offerData, error: offerError } = await supabase
+        .from('offers')
+        .select(`
+            job_type,
+            start_date,
+            end_date,
+            company:companies ( name ),
+            guide:guides ( name, email )
+        `)
+        .eq('id', offerId)
+        .eq('company_id', user.id) // Security check
+        .eq('status', 'pending') // Can only remind for pending offers
+        .single();
+
+    if (offerError || !offerData) {
+        console.error("Error fetching offer for reminder:", offerError);
+        return { success: false, message: 'No se pudo encontrar la oferta o ya no está pendiente.' };
+    }
+
+    const { job_type, start_date, end_date, company, guide } = offerData;
+
+    if (!guide?.email || !guide?.name || !company?.name || !job_type || !start_date || !end_date) {
+        return { success: false, message: 'Faltan datos para enviar el recordatorio.' };
+    }
+
+    try {
+        await sendOfferReminderEmail({
+            to: guide.email,
+            guideName: guide.name,
+            companyName: company.name,
+            jobType: job_type,
+            startDate: new Date(start_date.replace(/-/g, '/')),
+            endDate: new Date(end_date.replace(/-/g, '/')),
+        });
+        return { success: true, message: `Se ha enviado un recordatorio a ${guide.name}.` };
+    } catch (emailError) {
+        console.error("Error al enviar el email de recordatorio:", emailError);
+        return { success: false, message: 'No se pudo enviar el correo de recordatorio.' };
+    }
 }

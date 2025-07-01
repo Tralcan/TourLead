@@ -5,7 +5,7 @@ import React from "react";
 import Link from 'next/link';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Loader2, Edit, Trash, User, UserPlus, Eye, ShieldCheck, DollarSign } from "lucide-react";
+import { Loader2, Edit, Trash, User, UserPlus, Eye, ShieldCheck, DollarSign, BellRing, Trash2 } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -29,7 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
-import { updateOfferDetails, cancelPendingOffersForJob } from "@/app/actions/offers";
+import { updateOfferDetails, cancelPendingOffersForJob, remindOffer, rejectOffer } from "@/app/actions/offers";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { type Guide } from "@/lib/types";
 import { StarRatingDisplay } from "@/components/star-rating";
@@ -59,8 +59,63 @@ async function getGuideRating(guideId: string) {
 }
 
 
-function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: Guide, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+type Offer = {
+    id: number;
+    job_type: string | null;
+    description: string | null;
+    start_date: string;
+    end_date: string;
+    contact_person: string | null;
+    contact_phone: string | null;
+    status: 'pending' | 'accepted' | 'rejected';
+    guide: Guide;
+};
+
+function GuideProfileDialog({ 
+    offer, 
+    isOpen, 
+    onOpenChange,
+    onActionComplete 
+}: { 
+    offer: Offer | null, 
+    isOpen: boolean, 
+    onOpenChange: (open: boolean) => void,
+    onActionComplete: () => void 
+}) {
+    const { toast } = useToast();
+    const [isActionLoading, setIsActionLoading] = React.useState(false);
+
+    if (!offer) return null;
+    const guide = offer.guide;
     if (!guide) return null;
+
+    const handleRemind = async () => {
+        if (!offer) return;
+        setIsActionLoading(true);
+        const result = await remindOffer({ offerId: offer.id });
+        if (result.success) {
+            toast({ title: "Éxito", description: result.message });
+            onOpenChange(false);
+        } else {
+            toast({ title: "Error", description: result.message, variant: "destructive" });
+        }
+        setIsActionLoading(false);
+    };
+
+    const handleCancel = async () => {
+        if (!offer) return;
+        setIsActionLoading(true);
+        const result = await rejectOffer({ offerId: offer.id });
+        if (result.success) {
+            toast({ title: "Oferta Cancelada", description: "La oferta ha sido cancelada exitosamente." });
+            onActionComplete();
+            onOpenChange(false);
+        } else {
+            toast({ title: "Error", description: result.message, variant: "destructive" });
+        }
+        setIsActionLoading(false);
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
@@ -114,27 +169,28 @@ function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: Guide, isO
                         </div>
                     )}
                 </div>
-                <DialogFooter>
-                    <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-                        Cerrar
-                    </Button>
+                <DialogFooter className="sm:justify-between flex-col sm:flex-row gap-2">
+                    {offer && offer.status === 'pending' ? (
+                        <>
+                            <Button variant="destructive" onClick={handleCancel} disabled={isActionLoading}>
+                                {isActionLoading ? <Loader2 className="animate-spin mr-2"/> : <Trash2 className="mr-2"/>}
+                                Cancelar Oferta
+                            </Button>
+                            <Button onClick={handleRemind} disabled={isActionLoading}>
+                                {isActionLoading ? <Loader2 className="animate-spin mr-2"/> : <BellRing className="mr-2"/>}
+                                Recordar Oferta
+                            </Button>
+                        </>
+                    ) : (
+                        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+                            Cerrar
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
     )
 }
-
-type Offer = {
-    id: number;
-    job_type: string | null;
-    description: string | null;
-    start_date: string;
-    end_date: string;
-    contact_person: string | null;
-    contact_phone: string | null;
-    status: 'pending' | 'accepted' | 'rejected';
-    guide: Guide;
-};
 
 type OfferCampaign = {
     campaignId: string;
@@ -289,7 +345,7 @@ export default function ActiveOffersPage() {
     const [selectedCampaignForCancel, setSelectedCampaignForCancel] = React.useState<OfferCampaign | null>(null);
     const [isCanceling, setIsCanceling] = React.useState(false);
 
-    const [selectedGuide, setSelectedGuide] = React.useState<Guide | null>(null);
+    const [selectedOfferForProfile, setSelectedOfferForProfile] = React.useState<Offer | null>(null);
     const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false);
 
     const fetchCampaigns = React.useCallback(async () => {
@@ -396,8 +452,8 @@ export default function ActiveOffersPage() {
         setSelectedCampaignForCancel(null);
     };
 
-    const handleViewProfile = (guide: Guide) => {
-        setSelectedGuide(guide);
+    const handleViewProfile = (offer: Offer) => {
+        setSelectedOfferForProfile(offer);
         setIsProfileDialogOpen(true);
     };
     
@@ -489,7 +545,7 @@ export default function ActiveOffersPage() {
                                                         <button 
                                                             key={offer.guide.id}
                                                             className="flex items-center gap-2 p-1 rounded-md hover:bg-background transition-colors"
-                                                            onClick={() => handleViewProfile(offer.guide)}
+                                                            onClick={() => handleViewProfile(offer)}
                                                         >
                                                             <Avatar className="h-8 w-8">
                                                                 <AvatarImage src={offer.guide.avatar ?? undefined} alt={offer.guide.name ?? ''} />
@@ -510,7 +566,7 @@ export default function ActiveOffersPage() {
                                                          <button 
                                                             key={offer.guide.id}
                                                             className="flex items-center gap-2 p-1 rounded-md hover:bg-background transition-colors"
-                                                            onClick={() => handleViewProfile(offer.guide)}
+                                                            onClick={() => handleViewProfile(offer)}
                                                         >
                                                             <Avatar className="h-8 w-8">
                                                                 <AvatarImage src={offer.guide.avatar ?? undefined} alt={offer.guide.name ?? ''} />
@@ -556,11 +612,12 @@ export default function ActiveOffersPage() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            {selectedGuide && (
+            {selectedOfferForProfile && (
                 <GuideProfileDialog
-                    guide={selectedGuide}
+                    offer={selectedOfferForProfile}
                     isOpen={isProfileDialogOpen}
                     onOpenChange={setIsProfileDialogOpen}
+                    onActionComplete={fetchCampaigns}
                 />
             )}
         </>

@@ -108,3 +108,54 @@ export async function sendAcceptanceNotificationEmail({ to, companyName, guideNa
         text: textBody,
     });
 }
+
+type SendOfferReminderEmailProps = {
+    to: string;
+    guideName: string;
+    companyName: string;
+    jobType: string;
+    startDate: Date;
+    endDate: Date;
+}
+
+export async function sendOfferReminderEmail({ to, guideName, companyName, jobType, startDate, endDate }: SendOfferReminderEmailProps) {
+    if (!process.env.RESEND_API_KEY) {
+        console.error("La API Key de Resend no está configurada.");
+        throw new Error("La configuración del servicio de correo está incompleta.");
+    }
+
+    const from = 'TourLead <tourlead@notifications.cl>';
+    const subject = `Recordatorio: ¡Tienes una oferta de trabajo pendiente de ${companyName}!`;
+    const formattedStartDate = format(startDate, "d 'de' MMMM 'de' yyyy", { locale: es });
+    const formattedEndDate = format(endDate, "d 'de' MMMM 'de' yyyy", { locale: es });
+
+    const appUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h1>¡Hola ${guideName}!</h1>
+        <p>Solo un recordatorio amistoso de que tienes una oferta de trabajo pendiente de <strong>${companyName}</strong> en TourLead Connect.</p>
+        <h2>Detalles de la Oferta:</h2>
+        <ul>
+            <li><strong>Tipo de Trabajo:</strong> ${jobType}</li>
+            <li><strong>Fechas:</strong> Del ${formattedStartDate} al ${formattedEndDate}</li>
+        </ul>
+        <p>La empresa está muy interesada en tu perfil. Para ver todos los detalles y responder, por favor ingresa a tu panel:</p>
+        <a href="${appUrl}/guide/offers" style="background-color: #FFB347; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Ver mis ofertas</a>
+        <br>
+        <p>Si el botón no funciona, copia y pega esta URL en tu navegador: ${appUrl}/guide/offers</p>
+        <br>
+        <p>¡Gracias por usar TourLead Connect!</p>
+      </div>
+    `;
+
+    const textBody = `¡Hola ${guideName}!\n\nSolo un recordatorio amistoso de que tienes una oferta de trabajo pendiente de ${companyName} en TourLead Connect.\n\nDetalles de la Oferta:\n- Tipo de Trabajo: ${jobType}\n- Fechas: Del ${formattedStartDate} al ${formattedEndDate}\n\nLa empresa está muy interesada en tu perfil. Para ver todos los detalles y responder, visita la siguiente URL:\n${appUrl}/guide/offers\n\n¡Gracias por usar TourLead Connect!`;
+
+    return await resend.emails.send({
+        from: from,
+        to: to,
+        subject: subject,
+        html: htmlBody,
+        text: textBody,
+    });
+}
