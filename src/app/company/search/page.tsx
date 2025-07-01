@@ -452,7 +452,14 @@ export default function SearchGuidesPage() {
                     setIsLoading(true);
                     
                     const [guidesRes, specialtiesRes, languagesRes, commitmentsRes] = await Promise.all([
-                        supabase.from('guides').select('*'),
+                        supabase.from('guides').select('*')
+                            .not('summary', 'is', null)
+                            .neq('summary', '')
+                            .not('specialties', 'is', null)
+                            .neq('specialties', '{}')
+                            .not('languages', 'is', null)
+                            .neq('languages', '{}')
+                            .gt('rate', 0),
                         supabase.from('expertise').select('name').eq('state', true),
                         supabase.from('languaje').select('name'),
                         supabase.from('commitments').select('guide_id, start_date, end_date').gte('end_date', today)
