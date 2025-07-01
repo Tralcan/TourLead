@@ -54,6 +54,7 @@ type CommitmentHistory = {
     start_date: string;
     end_date: string;
     company_rating: number | null;
+    guide_rating: number | null;
     offer_id: number | null;
     company: Company;
     offer?: OfferDetails | null;
@@ -202,7 +203,7 @@ export default function CommitmentsHistoryPage() {
             const today = new Date().toISOString().split('T')[0];
             const { data: commitmentsData, error } = await supabase
                 .from('commitments')
-                .select(`id, job_type, start_date, end_date, company_rating, offer_id, company:companies(*)`)
+                .select(`id, job_type, start_date, end_date, company_rating, guide_rating, offer_id, company:companies(*)`)
                 .eq('guide_id', user.id)
                 .lt('end_date', today)
                 .order('start_date', { ascending: false });
@@ -292,7 +293,8 @@ export default function CommitmentsHistoryPage() {
                 'Trabajo': item.job_type,
                 'Fecha Inicio': format(new Date(item.start_date.replace(/-/g, '/')), "yyyy-MM-dd"),
                 'Fecha Fin': format(new Date(item.end_date.replace(/-/g, '/')), "yyyy-MM-dd"),
-                'Calificación': item.company_rating || 'N/A',
+                'Calificación Recibida': item.guide_rating || 'N/A',
+                'Calificación Otorgada': item.company_rating || 'N/A',
                 'Total Pagado': totalPay.toLocaleString('es-CL'),
             }
         });
@@ -339,12 +341,18 @@ export default function CommitmentsHistoryPage() {
                                     <span className="font-semibold">Total Pagado: </span>
                                     ${totalPay.toLocaleString('es-CL')}
                                 </div>
-                                <div className="border-t pt-4">
-                                     <RateEntity
-                                        entityName={item.company.name ?? 'Empresa'}
-                                        currentRating={item.company_rating ?? undefined}
-                                        onSave={(rating, comment) => handleRateCompany(item.id, rating, comment)}
-                                    />
+                                <div className="border-t pt-4 space-y-4">
+                                     <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-sm">Tu Calificación:</span>
+                                        <StarRatingDisplay rating={item.guide_rating ?? 0} />
+                                    </div>
+                                    <div>
+                                        <RateEntity
+                                            entityName={item.company.name ?? 'Empresa'}
+                                            currentRating={item.company_rating ?? undefined}
+                                            onSave={(rating, comment) => handleRateCompany(item.id, rating, comment)}
+                                        />
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -384,7 +392,11 @@ export default function CommitmentsHistoryPage() {
                                         </button>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <div className="flex justify-end">
+                                        <div className="flex flex-col items-end gap-2">
+                                            <div className="flex items-center" title="La calificación que te dio la empresa">
+                                                <span className="text-xs text-muted-foreground mr-2">Recibida:</span>
+                                                <StarRatingDisplay rating={item.guide_rating ?? 0} />
+                                            </div>
                                             <RateEntity
                                                 entityName={item.company.name ?? 'Empresa'}
                                                 currentRating={item.company_rating ?? undefined}
@@ -434,4 +446,3 @@ export default function CommitmentsHistoryPage() {
         </>
     );
 }
-
