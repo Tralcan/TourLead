@@ -19,7 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { History, ShieldCheck, Loader2 } from "lucide-react";
+import { ShieldCheck, Loader2 } from "lucide-react";
 import { StarRatingDisplay } from "@/components/star-rating";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
@@ -412,17 +412,9 @@ export default function HiredGuidesPage() {
     return (
         <>
             <Card>
-                <CardHeader className="flex-row items-center justify-between">
-                    <div>
-                        <CardTitle>Gestión de Guías</CardTitle>
-                        <CardDescription>Revisa el estado de tus ofertas y gestiona a los guías que has contratado, agrupados por trabajo.</CardDescription>
-                    </div>
-                    <Link href="/company/hired/history" passHref>
-                        <Button variant="outline">
-                            <History className="mr-2 h-4 w-4" />
-                            Ver Historial
-                        </Button>
-                    </Link>
+                <CardHeader>
+                    <CardTitle>Gestión de Guías</CardTitle>
+                    <CardDescription>Revisa el estado de tus ofertas y gestiona a los guías que has contratado, agrupados por trabajo.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {renderContent()}

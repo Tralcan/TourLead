@@ -5,7 +5,7 @@ import React from "react";
 import Link from 'next/link';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Loader2, Edit, Trash, User, UserPlus, Eye, ShieldCheck, DollarSign, BellRing, Trash2 } from "lucide-react";
+import { Loader2, Edit, Trash, User, UserPlus, Eye, ShieldCheck, DollarSign, BellRing, Trash2, History } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -460,11 +460,19 @@ export default function ActiveOffersPage() {
     return (
         <>
             <Card>
-                <CardHeader>
-                    <CardTitle>Ofertas de Trabajo Vigentes</CardTitle>
-                    <CardDescription>
-                        Gestiona las ofertas que has enviado. Aquí puedes editarlas, cancelarlas o añadir más guías.
-                    </CardDescription>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <CardTitle>Ofertas de Trabajo Vigentes</CardTitle>
+                        <CardDescription>
+                            Gestiona las ofertas que has enviado. Aquí puedes editarlas, cancelarlas o añadir más guías.
+                        </CardDescription>
+                    </div>
+                    <Link href="/company/hired/history" passHref>
+                        <Button variant="outline" className="mt-4 w-full sm:mt-0 sm:w-auto">
+                            <History className="mr-2 h-4 w-4" />
+                            Ver Historial
+                        </Button>
+                    </Link>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {isLoading ? (
