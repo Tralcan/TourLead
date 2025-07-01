@@ -6,10 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
 import { createClient } from '@/lib/supabase/server';
 
+const factorial = (n: number): number => {
+  if (n < 0) return 0;
+  if (n === 0) return 1;
+  let result = 1;
+  for (let i = 2; i <= n; i++) {
+    result *= i;
+  }
+  return result;
+};
+
 export default async function Home() {
   const supabase = createClient();
   
-  // 1. Fetch guides with complete profiles to count them, their specialties, and languages
+  // 1. Fetch guides with complete profiles
   const { data: completeGuides, error: guidesError } = await supabase
     .from('guides')
     .select('id, specialties, languages')
@@ -23,16 +33,15 @@ export default async function Home() {
   
   const guideCount = completeGuides?.length ?? 0;
   
-  // 2. Calculate the number of distinct specialties and languages from these guides
-  const allSpecialties = new Set<string>();
+  // 2. Calculate stats
+  let specialtyCombinationCount = 0;
   const allLanguages = new Set<string>();
+
   if (completeGuides) {
       for (const guide of completeGuides) {
-          if (guide.specialties) {
-              for (const specialty of guide.specialties) {
-                  allSpecialties.add(specialty);
-              }
-          }
+          const numSpecialties = guide.specialties?.length ?? 0;
+          specialtyCombinationCount += factorial(numSpecialties);
+
           if (guide.languages) {
               for (const language of guide.languages) {
                   allLanguages.add(language);
@@ -40,11 +49,11 @@ export default async function Home() {
           }
       }
   }
-  const specialtyCount = allSpecialties.size;
+
   const languageCount = allLanguages.size;
   
   const displayGuideCount = guideCount;
-  const displaySpecialtyCount = specialtyCount;
+  const displaySpecialtyCount = specialtyCombinationCount;
   const displayLanguageCount = languageCount;
 
   return (
@@ -69,7 +78,7 @@ export default async function Home() {
           </p>
           <div className="mt-6 max-w-3xl mx-auto">
             <p className="text-muted-foreground">
-              Explora una red de <strong className="text-foreground font-semibold">{displayGuideCount.toLocaleString('es-CL')} guías profesionales</strong> con más de <strong className="text-foreground font-semibold">{displaySpecialtyCount.toLocaleString('es-CL')} especialidades distintas</strong> y más de <strong className="text-foreground font-semibold">{displayLanguageCount.toLocaleString('es-CL')} idiomas</strong>.
+              Explora una red de <strong className="text-foreground font-semibold">{displayGuideCount.toLocaleString('es-CL')} guías profesionales</strong> con más de <strong className="text-foreground font-semibold">{displaySpecialtyCount.toLocaleString('es-CL')} combinaciones de especialidades</strong> y más de <strong className="text-foreground font-semibold">{displayLanguageCount.toLocaleString('es-CL')} idiomas</strong>.
             </p>
           </div>
           <div className="mt-8 flex justify-center gap-4">
