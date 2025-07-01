@@ -213,11 +213,13 @@ export default function HiredHistoryPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <RateEntity
-                                                        entityName={item.guide.name ?? 'Guía'}
-                                                        currentRating={item.guide_rating ?? undefined}
-                                                        onSave={(rating, comment) => handleRateGuide(item.id, rating, comment)}
-                                                    />
+                                                    <div className="flex justify-end">
+                                                        <RateEntity
+                                                            entityName={item.guide.name ?? 'Guía'}
+                                                            currentRating={item.guide_rating ?? undefined}
+                                                            onSave={(rating, comment) => handleRateGuide(item.id, rating, comment)}
+                                                        />
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
