@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { format, isPast } from "date-fns";
 import { es } from "date-fns/locale";
 import { History, User as UserIcon, Phone, Smartphone, MapPin, PhoneCall } from "lucide-react";
-import { RateEntity, StarRatingDisplay } from '@/components/star-rating';
+import { StarRatingDisplay } from '@/components/star-rating';
 import { Commitment, Company } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -179,19 +179,9 @@ export default function CommitmentsPage() {
 
             const today = new Date().toISOString().split('T')[0];
 
-            // 1. Fetch commitments
             const { data: commitmentsData, error: commitmentsError } = await supabase
                 .from('commitments')
-                .select(`
-                    id,
-                    job_type,
-                    start_date,
-                    end_date,
-                    guide_rating,
-                    company_rating,
-                    offer_id,
-                    company:companies(*)
-                `)
+                .select(`id, job_type, start_date, end_date, offer_id, company:companies(*)`)
                 .eq('guide_id', user.id)
                 .gte('end_date', today)
                 .order('start_date', { ascending: true });
@@ -203,7 +193,6 @@ export default function CommitmentsPage() {
                 return;
             }
 
-            // 2. Fetch related offers
             const offerIds = commitmentsData.map(c => c.offer_id).filter((id): id is number => id !== null);
             const offersMap = new Map<number, { description: string | null; contact_person: string | null; contact_phone: string | null; }>();
 
@@ -223,7 +212,6 @@ export default function CommitmentsPage() {
                 }
             }
             
-            // 3. Combine data
             const transformedData = await Promise.all(commitmentsData.map(async (c) => {
                 if (!c.company) {
                     console.warn(`El compromiso con id ${c.id} no tiene una empresa asociada o no se pudo cargar.`);
@@ -255,25 +243,11 @@ export default function CommitmentsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [supabase, toast]);
+    }, [toast]);
 
     React.useEffect(() => {
         fetchCommitments();
     }, [fetchCommitments]);
-
-    const handleRateCompany = async (commitmentId: number, rating: number) => {
-        const { error } = await supabase
-            .from('commitments')
-            .update({ company_rating: rating })
-            .eq('id', commitmentId);
-
-        if (error) {
-            toast({ title: "Error", description: "No se pudo guardar la calificación.", variant: "destructive" });
-        } else {
-            toast({ title: "Éxito", description: "Calificación guardada correctamente." });
-            fetchCommitments();
-        }
-    };
     
     const handleViewProfile = (company: Company) => {
         setSelectedCompany(company);
@@ -301,7 +275,9 @@ export default function CommitmentsPage() {
                     {commitments.map((commitment) => (
                         <Card key={commitment.id}>
                             <CardHeader>
-                                <CardTitle className="text-base">{commitment.company.name}</CardTitle>
+                                <button onClick={() => handleViewProfile(commitment.company)} className="p-0 m-0 border-0 bg-transparent text-left cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
+                                    <CardTitle className="text-base pointer-events-none">{commitment.company.name}</CardTitle>
+                                </button>
                                 <CardDescription>{commitment.offer?.contact_phone || 'Teléfono no disponible'}</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm">
@@ -314,21 +290,10 @@ export default function CommitmentsPage() {
                                 </div>
                                 <div>
                                     <span className="font-semibold">Estado: </span>
-                                     {isPast(commitment.endDate) ? (
-                                        <Badge variant="outline">Finalizado</Badge>
-                                    ) : (
-                                        <Badge variant="outline">Próximo</Badge>
-                                    )}
+                                    <Badge variant="outline">Próximo</Badge>
                                 </div>
                             </CardContent>
-                            <CardFooter className="flex-col items-center gap-2">
-                                {isPast(commitment.endDate) && (
-                                    <RateEntity 
-                                        entityName={commitment.company.name} 
-                                        currentRating={commitment.company_rating ?? undefined}
-                                        onSave={(rating) => handleRateCompany(commitment.id, rating)}
-                                    />
-                                )}
+                            <CardFooter>
                                 <Button variant="outline" size="sm" onClick={() => handleViewProfile(commitment.company as Company)} className="w-full">
                                     Ver Perfil de Empresa
                                 </Button>
@@ -353,8 +318,10 @@ export default function CommitmentsPage() {
                             {commitments.map((commitment) => (
                                 <TableRow key={commitment.id}>
                                     <TableCell>
-                                        <div className="font-medium">{commitment.company.name}</div>
-                                        <div className="text-sm text-muted-foreground">{commitment.offer?.contact_phone || 'Teléfono no disponible'}</div>
+                                        <button onClick={() => handleViewProfile(commitment.company)} className="p-0 m-0 border-0 bg-transparent text-left cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
+                                            <div className="font-medium pointer-events-none">{commitment.company.name}</div>
+                                            <div className="text-sm text-muted-foreground pointer-events-none">{commitment.offer?.contact_phone || 'Teléfono no disponible'}</div>
+                                        </button>
                                     </TableCell>
                                     <TableCell>
                                         {format(commitment.startDate, "d MMM, yyyy", { locale: es })} - {format(commitment.endDate, "d MMM, yyyy", { locale: es })}
@@ -365,25 +332,12 @@ export default function CommitmentsPage() {
                                         </button>
                                     </TableCell>
                                     <TableCell>
-                                        {isPast(commitment.endDate) ? (
-                                            <Badge variant="outline">Finalizado</Badge>
-                                        ) : (
-                                            <Badge variant="outline">Próximo</Badge>
-                                        )}
+                                        <Badge variant="outline">Próximo</Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            {isPast(commitment.endDate) ? (
-                                                <RateEntity 
-                                                    entityName={commitment.company.name} 
-                                                    currentRating={commitment.company_rating ?? undefined}
-                                                    onSave={(rating) => handleRateCompany(commitment.id, rating)}
-                                                />
-                                            ) : null}
-                                            <Button variant="outline" size="sm" onClick={() => handleViewProfile(commitment.company as Company)}>
-                                                Ver Perfil
-                                            </Button>
-                                        </div>
+                                        <Button variant="outline" size="sm" onClick={() => handleViewProfile(commitment.company as Company)}>
+                                            Ver Perfil
+                                        </Button>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -395,24 +349,26 @@ export default function CommitmentsPage() {
     };
 
     return (
-        <Card>
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <CardTitle>Mis Compromisos Próximos</CardTitle>
-                    <CardDescription>Una lista de todos tus trabajos programados y futuros.</CardDescription>
-                </div>
-                 <Link href="/guide/commitments/history" passHref>
-                    <Button variant="outline" className="mt-4 sm:mt-0 w-full sm:w-auto">
-                        <History className="mr-2 h-4 w-4" />
-                        Ver Historial
-                    </Button>
-                </Link>
-            </CardHeader>
-            <CardContent>
-                {renderContent()}
-            </CardContent>
+        <>
+            <Card>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <CardTitle>Mis Compromisos Próximos</CardTitle>
+                        <CardDescription>Una lista de todos tus trabajos programados y futuros.</CardDescription>
+                    </div>
+                    <Link href="/guide/commitments/history" passHref>
+                        <Button variant="outline" className="mt-4 sm:mt-0 w-full sm:w-auto">
+                            <History className="mr-2 h-4 w-4" />
+                            Ver Historial
+                        </Button>
+                    </Link>
+                </CardHeader>
+                <CardContent>
+                    {renderContent()}
+                </CardContent>
+            </Card>
             {selectedCommitment && <CommitmentDetailsDialog commitment={selectedCommitment} isOpen={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen} />}
             {selectedCompany && <CompanyProfileDialog company={selectedCompany} isOpen={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen} />}
-        </Card>
+        </>
     );
 }
