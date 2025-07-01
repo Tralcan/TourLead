@@ -5,7 +5,7 @@ import React from "react";
 import Link from 'next/link';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Loader2, Edit, Trash, User, UserPlus } from "lucide-react";
+import { Loader2, Edit, Trash, User, UserPlus, Eye, ShieldCheck, DollarSign } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -31,14 +31,98 @@ import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
 import { updateOfferDetails, cancelPendingOffersForJob } from "@/app/actions/offers";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { type Guide } from "@/lib/types";
+import { StarRatingDisplay } from "@/components/star-rating";
+import { Badge } from "@/components/ui/badge";
 
 const supabase = createClient();
 
-type GuideInfo = {
-    id: string;
-    name: string | null;
-    avatar: string | null;
-};
+async function getGuideRating(guideId: string) {
+    const { data, error } = await supabase
+        .from('commitments')
+        .select('guide_rating')
+        .eq('guide_id', guideId)
+        .not('guide_rating', 'is', null);
+
+    if (error) {
+        return { rating: 0, reviews: 0 };
+    }
+    
+    if (!data || data.length === 0) {
+        return { rating: 0, reviews: 0 };
+    }
+
+    const totalRating = data.reduce((acc, curr) => acc + (curr.guide_rating || 0), 0);
+    const averageRating = totalRating / data.length;
+    const result = { rating: parseFloat(averageRating.toFixed(1)), reviews: data.length };
+    return result;
+}
+
+
+function GuideProfileDialog({ guide, isOpen, onOpenChange }: { guide: Guide, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+    if (!guide) return null;
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader className="flex flex-row items-center gap-4">
+                     <Avatar className="h-16 w-16">
+                        <AvatarImage src={guide.avatar ?? ''} alt={guide.name ?? ''} />
+                        <AvatarFallback>{guide.name?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-1">
+                        <DialogTitle className="text-2xl">{guide.name}</DialogTitle>
+                        <DialogDescription>
+                            {guide.email} {guide.phone && `• ${guide.phone}`}
+                        </DialogDescription>
+                        <StarRatingDisplay rating={guide.rating ?? 0} reviews={guide.reviews} />
+                    </div>
+                </DialogHeader>
+                <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                    {guide.summary && <p className="text-sm text-muted-foreground">{guide.summary}</p>}
+                    <div>
+                        <h4 className="font-semibold text-sm mb-2">Especialidades</h4>
+                        <div className="flex flex-wrap gap-2">
+                             {guide.specialties?.length ? guide.specialties.map(spec => <Badge key={spec} variant="secondary">{spec}</Badge>) : <p className="text-sm text-muted-foreground">No especificado</p>}
+                        </div>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-sm mb-2">Idiomas</h4>
+                         <div className="flex flex-wrap gap-2">
+                             {guide.languages?.length ? guide.languages.map(lang => <Badge key={lang} variant="secondary">{lang}</Badge>) : <p className="text-sm text-muted-foreground">No especificado</p>}
+                        </div>
+                    </div>
+                    <div className="border-t pt-4 mt-4">
+                        <h4 className="font-semibold text-sm mb-2">Información Académica</h4>
+                        <div className="space-y-2 text-sm text-muted-foreground">
+                            {guide.career && <p><span className="font-medium text-foreground">Carrera:</span> {guide.career}</p>}
+                            {guide.institution && <p><span className="font-medium text-foreground">Institución:</span> {guide.institution}</p>}
+                            {guide.is_certified && (
+                                <div className="flex items-center gap-2 pt-1">
+                                    <ShieldCheck className="h-5 w-5 text-green-600" />
+                                    <span className="font-medium text-foreground">Titulado</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    {guide.rate && (
+                        <div className="mt-4 border-t pt-4">
+                            <h4 className="font-semibold text-sm mb-2">Tarifa por día</h4>
+                             <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4" />
+                                <span>{guide.rate} / día</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+                        Cerrar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
 
 type Offer = {
     id: number;
@@ -48,7 +132,8 @@ type Offer = {
     end_date: string;
     contact_person: string | null;
     contact_phone: string | null;
-    guide: GuideInfo;
+    status: 'pending' | 'accepted' | 'rejected';
+    guide: Guide;
 };
 
 type OfferCampaign = {
@@ -57,8 +142,10 @@ type OfferCampaign = {
     description: string | null;
     start_date: string;
     end_date: string;
-    offers: Offer[];
-    hasAcceptedOffers: boolean;
+    contact_person: string | null;
+    contact_phone: string | null;
+    acceptedGuides: Offer[];
+    pendingGuides: Offer[];
 };
 
 const editOfferFormSchema = z.object({
@@ -81,12 +168,11 @@ function EditOfferDialog({ campaign, isOpen, onOpenChange, onUpdated }: { campai
     
     React.useEffect(() => {
         if (campaign) {
-            const firstOffer = campaign.offers[0];
             form.reset({
                 jobType: campaign.job_type ?? "",
                 description: campaign.description ?? "",
-                contactPerson: firstOffer?.contact_person ?? "",
-                contactPhone: firstOffer?.contact_phone ?? "",
+                contactPerson: campaign.contact_person ?? "",
+                contactPhone: campaign.contact_phone ?? "",
             });
         }
     }, [campaign, form]);
@@ -95,7 +181,7 @@ function EditOfferDialog({ campaign, isOpen, onOpenChange, onUpdated }: { campai
 
     const handleSubmit = async (values: EditOfferFormValues) => {
         setIsSubmitting(true);
-        const offerIds = campaign.offers.map(o => o.id);
+        const offerIds = campaign.pendingGuides.map(o => o.id);
         const result = await updateOfferDetails({
             offerIds,
             jobType: values.jobType,
@@ -120,7 +206,7 @@ function EditOfferDialog({ campaign, isOpen, onOpenChange, onUpdated }: { campai
                 <DialogHeader>
                     <DialogTitle>Editar Oferta de Trabajo</DialogTitle>
                     <DialogDescription>
-                        Estás editando la oferta para {campaign.offers.length} guía(s). Los cambios se aplicarán a todas las ofertas pendientes en esta campaña.
+                        Estás editando la oferta para {campaign.pendingGuides.length} guía(s) pendiente(s). Los cambios se aplicarán a todas las ofertas pendientes en esta campaña.
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
@@ -203,6 +289,9 @@ export default function ActiveOffersPage() {
     const [selectedCampaignForCancel, setSelectedCampaignForCancel] = React.useState<OfferCampaign | null>(null);
     const [isCanceling, setIsCanceling] = React.useState(false);
 
+    const [selectedGuide, setSelectedGuide] = React.useState<Guide | null>(null);
+    const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false);
+
     const fetchCampaigns = React.useCallback(async () => {
         setIsLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
@@ -214,15 +303,26 @@ export default function ActiveOffersPage() {
         try {
             const { data: offersData, error } = await supabase
                 .from('offers')
-                .select('id, job_type, description, start_date, end_date, contact_person, contact_phone, guide:guides(id, name, avatar)')
+                .select('id, job_type, description, start_date, end_date, contact_person, contact_phone, status, guide:guides(*)')
                 .eq('company_id', user.id)
-                .eq('status', 'pending')
+                .or('status.eq.pending,status.eq.accepted')
                 .gte('end_date', new Date().toISOString());
 
             if (error) throw error;
             
             if (offersData) {
-                const grouped = offersData.reduce((acc, offer) => {
+                const offersWithRatings = await Promise.all(
+                    offersData.map(async (offer) => {
+                        const guide = offer.guide as Guide;
+                        if (!guide) return null;
+                        const { rating, reviews } = await getGuideRating(guide.id);
+                        return { ...offer, guide: { ...guide, rating, reviews } } as Offer;
+                    })
+                );
+
+                const validOffers = offersWithRatings.filter(Boolean) as Offer[];
+                
+                const grouped = validOffers.reduce((acc, offer) => {
                     const key = `${offer.job_type}-${offer.start_date}-${offer.end_date}`;
                     if (!acc[key]) {
                         acc[key] = {
@@ -231,32 +331,24 @@ export default function ActiveOffersPage() {
                             description: offer.description,
                             start_date: offer.start_date,
                             end_date: offer.end_date,
-                            offers: [],
+                            contact_person: offer.contact_person,
+                            contact_phone: offer.contact_phone,
+                            acceptedGuides: [],
+                            pendingGuides: [],
                         };
                     }
-                    acc[key].offers.push(offer as Offer);
-                    return acc;
-                }, {} as Record<string, Omit<OfferCampaign, 'hasAcceptedOffers'>>);
 
-                const campaignsWithStatus = await Promise.all(Object.values(grouped).map(async (campaign) => {
-                    const { count, error: countError } = await supabase
-                        .from('offers')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('company_id', user.id)
-                        .eq('job_type', campaign.job_type!)
-                        .eq('start_date', campaign.start_date)
-                        .eq('end_date', campaign.end_date)
-                        .eq('status', 'accepted');
-                
-                    if (countError) {
-                        console.error("Error checking for accepted offers:", countError);
-                        return { ...campaign, hasAcceptedOffers: false }; // Safe default
+                    if (offer.status === 'accepted') {
+                        acc[key].acceptedGuides.push(offer);
+                    } else if (offer.status === 'pending') {
+                        acc[key].pendingGuides.push(offer);
                     }
-                
-                    return { ...campaign, hasAcceptedOffers: (count ?? 0) > 0 };
-                }));
+                    
+                    return acc;
+                }, {} as Record<string, OfferCampaign>);
 
-                setCampaigns(campaignsWithStatus.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()));
+
+                setCampaigns(Object.values(grouped).sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()));
             }
 
         } catch (error) {
@@ -303,6 +395,11 @@ export default function ActiveOffersPage() {
         setIsCancelDialogOpen(false);
         setSelectedCampaignForCancel(null);
     };
+
+    const handleViewProfile = (guide: Guide) => {
+        setSelectedGuide(guide);
+        setIsProfileDialogOpen(true);
+    };
     
     return (
         <>
@@ -310,7 +407,7 @@ export default function ActiveOffersPage() {
                 <CardHeader>
                     <CardTitle>Ofertas de Trabajo Vigentes</CardTitle>
                     <CardDescription>
-                        Gestiona las ofertas pendientes que has enviado. Aquí puedes editarlas, cancelarlas o añadir más guías.
+                        Gestiona las ofertas que has enviado. Aquí puedes editarlas, cancelarlas o añadir más guías.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -320,16 +417,17 @@ export default function ActiveOffersPage() {
                         <p className="text-center text-muted-foreground py-8">No tienes ofertas vigentes.</p>
                     ) : (
                         campaigns.map(campaign => {
-                            const isCancelDisabled = campaign.hasAcceptedOffers;
+                            const isCancelDisabled = campaign.acceptedGuides.length > 0;
+                            const allOfferedGuides = [...campaign.acceptedGuides, ...campaign.pendingGuides];
                             
                             const params = new URLSearchParams();
                             params.set('start_date', campaign.start_date);
                             params.set('end_date', campaign.end_date);
                             params.set('job_type', campaign.job_type || '');
                             params.set('description', campaign.description || '');
-                            params.set('contact_person', campaign.offers[0]?.contact_person || '');
-                            params.set('contact_phone', campaign.offers[0]?.contact_phone || '');
-                            const existingGuideIds = campaign.offers.map(o => o.guide.id).join(',');
+                            params.set('contact_person', campaign.contact_person || '');
+                            params.set('contact_phone', campaign.contact_phone || '');
+                            const existingGuideIds = allOfferedGuides.map(o => o.guide.id).join(',');
                             params.set('exclude_guides', existingGuideIds);
                             const href = `/company/search?${params.toString()}`;
 
@@ -380,20 +478,51 @@ export default function ActiveOffersPage() {
                                             </div>
                                         </div>
                                     </CardHeader>
-                                    <CardContent>
+                                    <CardContent className="space-y-4">
                                         <p className="text-sm text-muted-foreground mb-4">{campaign.description}</p>
-                                        <h4 className="font-semibold text-sm mb-2">Guías Ofertados ({campaign.offers.length}):</h4>
-                                        <div className="flex flex-wrap gap-4">
-                                            {campaign.offers.map(offer => (
-                                                <div key={offer.guide.id} className="flex items-center gap-2">
-                                                    <Avatar className="h-8 w-8">
-                                                        <AvatarImage src={offer.guide.avatar ?? undefined} alt={offer.guide.name ?? ''} />
-                                                        <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
-                                                    </Avatar>
-                                                    <span className="text-sm">{offer.guide.name}</span>
+                                        
+                                        {campaign.acceptedGuides.length > 0 && (
+                                            <div>
+                                                <h4 className="font-semibold text-sm mb-2">Guías Aceptados ({campaign.acceptedGuides.length}):</h4>
+                                                <div className="flex flex-wrap gap-4">
+                                                    {campaign.acceptedGuides.map(offer => (
+                                                        <button 
+                                                            key={offer.guide.id}
+                                                            className="flex items-center gap-2 p-1 rounded-md hover:bg-background transition-colors"
+                                                            onClick={() => handleViewProfile(offer.guide)}
+                                                        >
+                                                            <Avatar className="h-8 w-8">
+                                                                <AvatarImage src={offer.guide.avatar ?? undefined} alt={offer.guide.name ?? ''} />
+                                                                <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
+                                                            </Avatar>
+                                                            <span className="text-sm font-medium">{offer.guide.name}</span>
+                                                        </button>
+                                                    ))}
                                                 </div>
-                                            ))}
-                                        </div>
+                                            </div>
+                                        )}
+
+                                        {campaign.pendingGuides.length > 0 && (
+                                            <div>
+                                                <h4 className="font-semibold text-sm mb-2">Guías Pendientes ({campaign.pendingGuides.length}):</h4>
+                                                <div className="flex flex-wrap gap-4">
+                                                    {campaign.pendingGuides.map(offer => (
+                                                         <button 
+                                                            key={offer.guide.id}
+                                                            className="flex items-center gap-2 p-1 rounded-md hover:bg-background transition-colors"
+                                                            onClick={() => handleViewProfile(offer.guide)}
+                                                        >
+                                                            <Avatar className="h-8 w-8">
+                                                                <AvatarImage src={offer.guide.avatar ?? undefined} alt={offer.guide.name ?? ''} />
+                                                                <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
+                                                            </Avatar>
+                                                            <span className="text-sm">{offer.guide.name}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
                                     </CardContent>
                                 </Card>
                             );
@@ -426,6 +555,14 @@ export default function ActiveOffersPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {selectedGuide && (
+                <GuideProfileDialog
+                    guide={selectedGuide}
+                    isOpen={isProfileDialogOpen}
+                    onOpenChange={setIsProfileDialogOpen}
+                />
+            )}
         </>
     );
 }
