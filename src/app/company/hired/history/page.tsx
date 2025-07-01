@@ -12,12 +12,12 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { StarRatingDisplay } from "@/components/star-rating";
+import { StarRatingDisplay, RateEntity } from "@/components/star-rating";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ type Commitment = {
     job_type: string | null;
     start_date: string;
     end_date: string;
+    guide_rating: number | null;
 }
 
 type JobGroup = {
@@ -161,7 +162,7 @@ export default function HiredHistoryPage() {
             const today = new Date().toISOString().split('T')[0];
             const { error: commitmentsError, data: commitmentsData } = await supabase
                 .from('commitments')
-                .select('id, job_type, start_date, end_date, guide:guides(*)')
+                .select('id, job_type, start_date, end_date, guide_rating, guide:guides(*)')
                 .eq('company_id', user.id)
                 .lt('end_date', today)
                 .order('start_date', { ascending: false });
@@ -178,6 +179,7 @@ export default function HiredHistoryPage() {
                             job_type: item.job_type,
                             start_date: item.start_date,
                             end_date: item.end_date,
+                            guide_rating: item.guide_rating,
                             guide: { ...guide, rating, reviews },
                         };
                     })
@@ -216,6 +218,25 @@ export default function HiredHistoryPage() {
     const handleViewProfile = (guide: GuideInfo) => {
         setSelectedGuide(guide);
         setIsProfileDialogOpen(true);
+    };
+
+    const handleRateGuide = async (commitmentId: string, rating: number, comment: string) => {
+        const updateData: { guide_rating: number, guide_rating_comment?: string } = { guide_rating: rating };
+        if (comment) {
+            updateData.guide_rating_comment = comment;
+        }
+
+        const { error } = await supabase
+            .from('commitments')
+            .update(updateData)
+            .eq('id', commitmentId);
+
+        if (error) {
+            toast({ title: "Error", description: "No se pudo guardar la calificación.", variant: "destructive" });
+        } else {
+            toast({ title: "Éxito", description: "Calificación guardada correctamente." });
+            fetchHistory();
+        }
     };
 
     const calculateDays = (start: string, end: string) => {
@@ -283,7 +304,11 @@ export default function HiredHistoryPage() {
                                                 <div>
                                                     <CardTitle className="text-base">{item.guide.name}</CardTitle>
                                                     <CardDescription>
-                                                        <StarRatingDisplay rating={item.guide.rating ?? 0} reviews={item.guide.reviews}/>
+                                                        <RateEntity
+                                                            entityName={item.guide.name ?? 'Guía'}
+                                                            currentRating={item.guide_rating ?? undefined}
+                                                            onSave={(rating, comment) => handleRateGuide(item.id, rating, comment)}
+                                                        />
                                                     </CardDescription>
                                                 </div>
                                             </CardHeader>
@@ -306,8 +331,8 @@ export default function HiredHistoryPage() {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Guía</TableHead>
-                                            <TableHead>Valoraciones</TableHead>
                                             <TableHead>Días Contratado</TableHead>
+                                            <TableHead>Calificación</TableHead>
                                             <TableHead className="text-right">Total a Pagar</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -329,10 +354,16 @@ export default function HiredHistoryPage() {
                                                             </div>
                                                         </button>
                                                     </TableCell>
-                                                    <TableCell>
-                                                        <StarRatingDisplay rating={item.guide.rating ?? 0} reviews={item.guide.reviews}/>
-                                                    </TableCell>
                                                     <TableCell>{days}</TableCell>
+                                                    <TableCell>
+                                                        <div className="flex justify-start">
+                                                          <RateEntity
+                                                              entityName={item.guide.name ?? 'Guía'}
+                                                              currentRating={item.guide_rating ?? undefined}
+                                                              onSave={(rating, comment) => handleRateGuide(item.id, rating, comment)}
+                                                          />
+                                                        </div>
+                                                    </TableCell>
                                                     <TableCell className="text-right font-medium">
                                                         ${totalPay.toLocaleString('es-CL')}
                                                     </TableCell>
@@ -355,11 +386,11 @@ export default function HiredHistoryPage() {
                 <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <CardTitle>Historial de Guías Contratados</CardTitle>
-                        <CardDescription>Revisa los trabajos pasados, agrupados por evento.</CardDescription>
+                        <CardDescription>Revisa y califica los trabajos pasados, agrupados por evento.</CardDescription>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto pt-4 sm:pt-0">
                         <Button variant="outline" asChild>
-                            <Link href="/company/hired">
+                            <Link href="/company/offers">
                                 <ArrowLeft className="mr-2 h-4 w-4" />
                                 Volver
                             </Link>
