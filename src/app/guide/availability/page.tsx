@@ -60,8 +60,7 @@ export default function AvailabilityPage() {
         const { data: commitmentsData, error: commitmentsError } = await supabase
             .from('commitments')
             .select('start_date, end_date')
-            .eq('guide_id', user.id)
-            .gt('end_date', new Date().toISOString());
+            .eq('guide_id', user.id);
         
         if (commitmentsData) {
             const allBookedDays = commitmentsData.flatMap(c => 
