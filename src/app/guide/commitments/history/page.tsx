@@ -341,17 +341,25 @@ export default function CommitmentsHistoryPage() {
                                     <span className="font-semibold">Total Pagado: </span>
                                     ${totalPay.toLocaleString('es-CL')}
                                 </div>
-                                <div className="border-t pt-4 space-y-4">
-                                     <div className="flex justify-between items-center">
-                                        <span className="font-semibold text-sm">Tu Calificación:</span>
+                                <div className="border-t pt-4 space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-sm">Calificación Recibida:</span>
                                         <StarRatingDisplay rating={item.guide_rating ?? 0} />
                                     </div>
-                                    <div>
-                                        <RateEntity
-                                            entityName={item.company.name ?? 'Empresa'}
-                                            currentRating={item.company_rating ?? undefined}
-                                            onSave={(rating, comment) => handleRateCompany(item.id, rating, comment)}
-                                        />
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-sm">Calificar Empresa:</span>
+                                        {item.company_rating ? (
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-xs text-muted-foreground">Entregada:</span>
+                                                <StarRatingDisplay rating={item.company_rating} />
+                                            </div>
+                                        ) : (
+                                            <RateEntity
+                                                entityName={item.company.name ?? 'Empresa'}
+                                                currentRating={item.company_rating ?? undefined}
+                                                onSave={(rating, comment) => handleRateCompany(item.id, rating, comment)}
+                                            />
+                                        )}
                                     </div>
                                 </div>
                             </CardContent>
@@ -397,11 +405,20 @@ export default function CommitmentsHistoryPage() {
                                                 <span className="text-xs text-muted-foreground mr-2">Recibida:</span>
                                                 <StarRatingDisplay rating={item.guide_rating ?? 0} />
                                             </div>
-                                            <RateEntity
-                                                entityName={item.company.name ?? 'Empresa'}
-                                                currentRating={item.company_rating ?? undefined}
-                                                onSave={(rating, comment) => handleRateCompany(item.id, rating, comment)}
-                                            />
+                                            <div className="flex items-center" title="La calificación que le diste a la empresa">
+                                                {item.company_rating ? (
+                                                    <>
+                                                        <span className="text-xs text-muted-foreground mr-2">Entregada:</span>
+                                                        <StarRatingDisplay rating={item.company_rating} />
+                                                    </>
+                                                ) : (
+                                                    <RateEntity
+                                                        entityName={item.company.name ?? 'Empresa'}
+                                                        currentRating={item.company_rating ?? undefined}
+                                                        onSave={(rating, comment) => handleRateCompany(item.id, rating, comment)}
+                                                    />
+                                                )}
+                                            </div>
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-right font-medium">
