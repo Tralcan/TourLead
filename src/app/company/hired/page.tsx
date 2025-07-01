@@ -1,4 +1,3 @@
-
 "use client"
 import React from "react";
 import Link from "next/link";
@@ -233,7 +232,11 @@ export default function HiredGuidesPage() {
         }
 
         return (
-            <Accordion type="single" collapsible className="w-full">
+            <Accordion 
+                type="multiple" 
+                className="w-full"
+                defaultValue={jobs.map((_, index) => `item-${index}`)}
+            >
                 {jobs.map((job, index) => (
                     <AccordionItem value={`item-${index}`} key={index}>
                         <AccordionTrigger>

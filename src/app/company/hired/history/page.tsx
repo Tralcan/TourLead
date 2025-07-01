@@ -1,4 +1,3 @@
-
 "use client"
 import React from "react";
 import Link from "next/link";
@@ -332,7 +331,7 @@ export default function HiredHistoryPage() {
                                         <TableRow>
                                             <TableHead>Guía</TableHead>
                                             <TableHead>Días Contratado</TableHead>
-                                            <TableHead>Calificación</TableHead>
+                                            <TableHead className="text-right">Calificación</TableHead>
                                             <TableHead className="text-right">Total a Pagar</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -355,8 +354,8 @@ export default function HiredHistoryPage() {
                                                         </button>
                                                     </TableCell>
                                                     <TableCell>{days}</TableCell>
-                                                    <TableCell>
-                                                        <div className="flex justify-start">
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end">
                                                           <RateEntity
                                                               entityName={item.guide.name ?? 'Guía'}
                                                               currentRating={item.guide_rating ?? undefined}
@@ -390,7 +389,7 @@ export default function HiredHistoryPage() {
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto pt-4 sm:pt-0">
                         <Button variant="outline" asChild>
-                            <Link href="/company/offers">
+                            <Link href="/company/hired">
                                 <ArrowLeft className="mr-2 h-4 w-4" />
                                 Volver
                             </Link>
